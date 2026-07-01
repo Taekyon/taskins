@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.templating import Jinja2Templates
 
 from taskins.core.config import settings
+from taskins.core.database import init_db
 from taskins.core.engine import run_engine_loop
 
 logging.basicConfig(
@@ -19,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Démarrage du moteur d'ordonnancement")
+    init_db()
+    logger.info("Base de données initialisée")
     engine_task = asyncio.create_task(run_engine_loop())
     yield
     engine_task.cancel()
