@@ -1,0 +1,22 @@
+services:
+  taskins:
+    build: .
+    container_name: taskins-app
+    env_file: .env.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - taskins-db-dev:/app/data
+      - ./secrets:/app/secrets:ro
+      - .:/app
+    networks:
+      - taskins-net
+    command: uvicorn taskins.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  taskins-db-dev:
+    name: taskins-db-dev
+
+networks:
+  taskins-net:
+    name: taskins-net

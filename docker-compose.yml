@@ -1,0 +1,21 @@
+services:
+  taskins:
+    build: .
+    container_name: taskins-app
+    env_file: .env.prod
+    ports:
+      - "8000:8000"
+    volumes:
+      - taskins-db:/app/data
+      - ./secrets:/app/secrets:ro
+    networks:
+      - taskins-net
+    restart: unless-stopped
+
+volumes:
+  taskins-db:
+    name: taskins-db-prod
+
+networks:
+  taskins-net:
+    name: taskins-net
