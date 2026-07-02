@@ -61,7 +61,7 @@ def _seed(db) -> None:
             db.add(Machine(
                 alias="worker-1",
                 host="192.168.X.X",   # à corriger via l'interface d'administration
-                ssh_user="scheduler",
+                ssh_user="svc-taskins",
                 ssh_port=22,
             ))
 

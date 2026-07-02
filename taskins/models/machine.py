@@ -10,7 +10,7 @@ class Machine(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     alias: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     host: Mapped[str] = mapped_column(Text, nullable=False)
-    ssh_user: Mapped[str] = mapped_column(Text, nullable=False, default="scheduler")
+    ssh_user: Mapped[str] = mapped_column(Text, nullable=False, default="svc-taskins")
     ssh_port: Mapped[int] = mapped_column(Integer, nullable=False, default=22)
     created_at: Mapped[str] = mapped_column(Text, nullable=False, server_default=func.datetime("now"))
 
