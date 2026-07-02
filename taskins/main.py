@@ -1,14 +1,15 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
 from taskins.core.config import settings
 from taskins.core.database import init_db
 from taskins.core.engine import run_engine_loop
+from taskins.routes.web import auth as web_auth
+from taskins.routes.web import dashboard as web_dashboard
 
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,
@@ -34,4 +35,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Taskins", lifespan=lifespan)
 
-templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+# Session basée sur cookie signé (voir 06-controle-acces.md — gap comblé à l'étape 3).
+app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
+
+app.include_router(web_auth.router)
+app.include_router(web_dashboard.router)
