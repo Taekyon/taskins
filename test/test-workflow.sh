@@ -4,13 +4,14 @@ set -e
 
 BASE_URL="http://localhost:80"
 COOKIE_JAR=$(mktemp)
-ENV_FILE="../.env.dev"
+ENV_FILE="./.env.dev"
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "Fichier $ENV_FILE introuvable — ajuste ENV_FILE ou lance ce script depuis le bon répertoire." >&2
   exit 1
 fi
 
+# Récupération des identifiants d'admin depuis le fichier .env.dev
 ADMIN_USER=$(grep -E '^TASKINS_BOOTSTRAP_ADMIN_USERNAME=' "$ENV_FILE" | cut -d '=' -f2-)
 ADMIN_PASS=$(grep -E '^TASKINS_BOOTSTRAP_ADMIN_PASSWORD=' "$ENV_FILE" | cut -d '=' -f2- | sed "s/^['\"]//;s/['\"]$//")
 
@@ -33,11 +34,7 @@ RESPONSE=$(curl -s -b "$COOKIE_JAR" -w "\n%{http_code}" \
     "name": "sauvegarde-distante",
     "description": "test manuel",
     "tasks": [
-      {"name": "verifier_connectivite", "command": "ping -c 1 storage-server", "target": "worker-1"},
-      {"name": "dumper_base", "command": "pg_dump mabase > /tmp/dump.sql", "target": "worker-1",
-       "condition": {"task": "verifier_connectivite", "return_code": 0}},
-      {"name": "transferer_dump", "command": "scp /tmp/dump.sql storage:/backups/", "target": "worker-1",
-       "condition": {"task": "dumper_base", "return_code": 0}}
+      {"name": "verifier_connectivite", "command": "ping -c 3 scheduler-server.mshome.net", "target": "worker-3"}
     ]
   }')
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
