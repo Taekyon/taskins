@@ -1,13 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Connexion — Taskins{% endblock %}
 {% block content %}
-<h1>Connexion</h1>
-{% if error %}<p style="color:red">{{ error }}</p>{% endif %}
-<form method="post" action="/login">
-    <label>Utilisateur</label>
-    <input type="text" name="username" required>
-    <label>Mot de passe</label>
-    <input type="password" name="password" required>
-    <button type="submit">Se connecter</button>
-</form>
+<div style="max-width:320px; margin:60px auto 0;">
+  <p class="wordmark" style="font-size:20px; margin-bottom:24px;">taskins_</p>
+  {% if error %}<div class="error-box">{{ error }}</div>{% endif %}
+  <form method="post" action="/login">
+    <div class="field">
+      <label for="username">Utilisateur</label>
+      <input type="text" id="username" name="username" required autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Mot de passe</label>
+      <input type="password" id="password" name="password" required>
+    </div>
+    <button type="submit" class="btn" style="width:100%;">Se connecter</button>
+  </form>
+</div>
 {% endblock %}

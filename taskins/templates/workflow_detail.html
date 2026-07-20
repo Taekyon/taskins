@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}{{ workflow.name }} — Taskins{% endblock %}
+{% block content %}
+<p class="muted"><a href="/workflows">&larr; Workflows</a></p>
+<div class="page-header">
+  <h1>{{ workflow.name }}</h1>
+  {{ macros.status_pill(workflow.status) }}
+</div>
+{% if workflow.description %}<p class="muted">{{ workflow.description }}</p>{% endif %}
+<p class="muted" style="font-size:12px;">
+  Propriétaire : {{ workflow.owner.username }} · Groupe : {{ workflow.group.name }} · Créé le
+  <span class="mono">{{ workflow.created_at }}</span>
+</p>
+
+<h2>Tâches</h2>
+<table class="data-table">
+  <thead>
+    <tr><th>#</th><th>Nom</th><th>Commande</th><th>Cible</th><th>Condition</th></tr>
+  </thead>
+  <tbody>
+    {% for task in tasks %}
+    <tr>
+      <td class="muted">{{ task.order_index }}</td>
+      <td>{{ task.name }}</td>
+      <td class="mono">{{ task.command }}</td>
+      <td class="mono">{{ task.target }}</td>
+      <td class="muted">
+        {% if task.condition %}
+          si <span class="mono">{{ task.condition.task }}</span> = {{ task.condition.return_code }}
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Exécutions</h2>
+{% if executions %}
+<table class="data-table">
+  <thead>
+    <tr><th>ID</th><th>Statut</th><th>Débutée</th><th>Terminée</th></tr>
+  </thead>
+  <tbody>
+    {% for ex in executions %}
+    <tr>
+      <td><a href="/workflows/{{ workflow.id }}/executions/{{ ex.id }}">#{{ ex.id }}</a></td>
+      <td>{{ macros.status_pill(ex.status) }}</td>
+      <td class="muted mono">{{ ex.started_at or "—" }}</td>
+      <td class="muted mono">{{ ex.finished_at or "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">Aucune exécution pour l'instant.</p>
+{% endif %}
+{% endblock %}

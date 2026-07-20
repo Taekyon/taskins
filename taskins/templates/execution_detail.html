@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}Exécution #{{ execution.id }} — Taskins{% endblock %}
+{% block content %}
+<p class="muted"><a href="/workflows/{{ workflow.id }}">&larr; {{ workflow.name }}</a></p>
+<div class="page-header">
+  <h1>Exécution #{{ execution.id }}</h1>
+  {{ macros.status_pill(execution.status) }}
+</div>
+<p class="muted" style="font-size:12px;">
+  Débutée <span class="mono">{{ execution.started_at or "—" }}</span> ·
+  Terminée <span class="mono">{{ execution.finished_at or "—" }}</span>
+</p>
+
+<h2>Tâches</h2>
+<table class="data-table">
+  <thead>
+    <tr><th>#</th><th>Tâche</th><th>Statut</th><th>Code retour</th><th>Sortie</th></tr>
+  </thead>
+  <tbody>
+    {% for r in task_results %}
+    <tr>
+      <td class="muted">{{ r.task.order_index }}</td>
+      <td>{{ r.task.name }}</td>
+      <td>{{ macros.status_pill(r.status) }}</td>
+      <td class="mono">{{ r.return_code if r.return_code is not none else "—" }}</td>
+      <td>
+        {% if r.stdout or r.stderr %}
+        <details>
+          <summary>voir</summary>
+          {% if r.stdout %}<pre class="output">{{ r.stdout }}</pre>{% endif %}
+          {% if r.stderr %}<pre class="output" style="color:var(--status-failed);">{{ r.stderr }}</pre>{% endif %}
+        </details>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

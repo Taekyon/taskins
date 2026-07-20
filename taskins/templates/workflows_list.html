@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}Workflows — Taskins{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Workflows</h1>
+</div>
+{% if workflows %}
+<table class="data-table">
+  <thead>
+    <tr><th>Nom</th><th>Statut</th><th>Propriétaire</th><th>Créé le</th></tr>
+  </thead>
+  <tbody>
+    {% for wf in workflows %}
+    <tr>
+      <td><a href="/workflows/{{ wf.id }}">{{ wf.name }}</a></td>
+      <td>{{ macros.status_pill(wf.status) }}</td>
+      <td>{{ wf.owner.username }}</td>
+      <td class="muted mono">{{ wf.created_at }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">
+  Aucun workflow pour l'instant. Utilise <code class="mono">POST /api/v1/workflows</code>
+  ou <a href="/docs">/docs</a> pour en créer un — le formulaire web arrive à l'étape suivante.
+</p>
+{% endif %}
+{% endblock %}
