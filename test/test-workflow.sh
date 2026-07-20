@@ -31,10 +31,10 @@ RESPONSE=$(curl -s -b "$COOKIE_JAR" -w "\n%{http_code}" \
   -X POST "$BASE_URL/api/v1/workflows" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "sauvegarde-distante",
+    "name": "selfping",
     "description": "test manuel",
     "tasks": [
-      {"name": "verifier_connectivite", "command": "ping -c 3 scheduler-server.mshome.net", "target": "worker-3"}
+      {"name": "verifier_connectivite", "command": "ping -c 3 127.0.0.1", "target": "worker-1"}
     ]
   }')
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
