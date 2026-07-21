@@ -10,6 +10,12 @@
     {% if workflow.status == "DRAFT" %}
     <button class="btn" id="submit-btn">Soumettre</button>
     {% elif workflow.status == "PENDING" %}
+    <select id="target-select" style="background:var(--surface); border:1px solid var(--border); color:var(--text); padding:7px 10px; border-radius:4px; font-family:var(--font-mono); font-size:13px;">
+      <option value="">Cibles par défaut</option>
+      {% for m in machines %}
+      <option value="{{ m.alias }}">Tout sur {{ m.alias }}</option>
+      {% endfor %}
+    </select>
     <button class="btn" id="execute-btn">Exécuter</button>
     {% endif %}
   </div>
@@ -24,7 +30,7 @@
 <h2>Tâches</h2>
 <table class="data-table">
   <thead>
-    <tr><th>#</th><th>Nom</th><th>Commande</th><th>Cible</th><th>Condition</th></tr>
+    <tr><th>#</th><th>Nom</th><th>Commande</th><th>Cible par défaut</th><th>Condition</th><th>Timeout</th></tr>
   </thead>
   <tbody>
     {% for task in tasks %}
@@ -38,6 +44,9 @@
           si <span class="mono">{{ task.condition.task }}</span> = {{ task.condition.return_code }}
         {% else %}—{% endif %}
       </td>
+      <td class="muted mono">
+        {% if task.timeout_seconds %}{{ task.timeout_seconds }}s{% else %}{{ default_timeout }}s <span style="font-size:11px;">(défaut)</span>{% endif %}
+      </td>
     </tr>
     {% endfor %}
   </tbody>
@@ -47,13 +56,14 @@
 {% if executions %}
 <table class="data-table">
   <thead>
-    <tr><th>ID</th><th>Statut</th><th>Débutée</th><th>Terminée</th></tr>
+    <tr><th>ID</th><th>Statut</th><th>Cible</th><th>Débutée</th><th>Terminée</th></tr>
   </thead>
   <tbody>
     {% for ex in executions %}
     <tr>
       <td><a href="/workflows/{{ workflow.id }}/executions/{{ ex.id }}">#{{ ex.id }}</a></td>
       <td>{{ macros.status_pill(ex.status) }}</td>
+      <td class="muted mono">{% if ex.machine %}{{ ex.machine.alias }}{% else %}<span style="font-family:var(--font-ui);">par défaut</span>{% endif %}</td>
       <td class="muted mono">{{ ex.started_at or "—" }}</td>
       <td class="muted mono">{{ ex.finished_at or "—" }}</td>
     </tr>
@@ -65,10 +75,15 @@
 {% endif %}
 
 <script>
-async function postAction(url) {
+async function postAction(url, body) {
   const errorBox = document.getElementById('action-error');
   errorBox.style.display = 'none';
-  const res = await fetch(url, { method: 'POST', credentials: 'same-origin' });
+  const opts = { method: 'POST', credentials: 'same-origin' };
+  if (body) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(url, opts);
   if (res.ok) {
     location.reload();
   } else {
@@ -82,7 +97,10 @@ async function postAction(url) {
 const submitBtn = document.getElementById('submit-btn');
 if (submitBtn) submitBtn.addEventListener('click', () => postAction('/api/v1/workflows/{{ workflow.id }}/submit'));
 const executeBtn = document.getElementById('execute-btn');
-if (executeBtn) executeBtn.addEventListener('click', () => postAction('/api/v1/workflows/{{ workflow.id }}/execute'));
+if (executeBtn) executeBtn.addEventListener('click', () => {
+  const alias = document.getElementById('target-select').value;
+  postAction('/api/v1/workflows/{{ workflow.id }}/execute', alias ? { machine: alias } : null);
+});
 
 {% set active_executions = executions | selectattr('status', 'in', ['PENDING', 'RUNNING']) | list %}
 {% if active_executions %}

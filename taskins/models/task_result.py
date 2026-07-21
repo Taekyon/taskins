@@ -17,6 +17,11 @@ class TaskResult(Base):
     )
     task_id: Mapped[int] = mapped_column(Integer, ForeignKey("tasks.id"), nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="PENDING")
+    # Instantané figé au moment de l'exécution : rend l'historique autonome,
+    # indépendant des évolutions ou suppressions ultérieures de tasks/machines.
+    command: Mapped[str | None] = mapped_column(Text)
+    machine_alias: Mapped[str | None] = mapped_column(Text)
+    machine_host: Mapped[str | None] = mapped_column(Text)
     return_code: Mapped[int | None] = mapped_column(Integer)
     stdout: Mapped[str | None] = mapped_column(Text)
     stderr: Mapped[str | None] = mapped_column(Text)

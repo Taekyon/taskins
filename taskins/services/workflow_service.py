@@ -51,6 +51,7 @@ def create_workflow(db: Session, data: WorkflowCreate, owner: User) -> Workflow:
             command=task_in.command,
             machine_id=machines_by_alias[task_in.target].id,
             order_index=index,
+            timeout_seconds=task_in.timeout_seconds,
         )
         db.add(task)
         db.flush()
@@ -87,14 +88,53 @@ def submit_workflow(db: Session, workflow: Workflow) -> Workflow:
     return workflow
 
 
-def execute_workflow(db: Session, workflow: Workflow) -> Execution:
+def execute_workflow(
+    db: Session, workflow: Workflow, machine_alias: str | None = None
+) -> Execution:
+    """Crée une exécution en attente. `machine_alias` permet de rediriger toutes
+    les tâches vers une autre machine sans toucher à la définition du workflow
+    (retargeting, option B) — la définition reste immuable."""
     if workflow.status != "PENDING":
         raise WorkflowValidationError("Seul un workflow approuvé (PENDING) peut être exécuté")
-    execution = Execution(workflow_id=workflow.id, status="PENDING")
+
+    machine_id = None
+    if machine_alias:
+        machine = machine_service.get_machine_by_alias(db, machine_alias)
+        if machine is None:
+            raise WorkflowValidationError(f"Machine cible inconnue : '{machine_alias}'")
+        machine_id = machine.id
+
+    execution = Execution(workflow_id=workflow.id, status="PENDING", machine_id=machine_id)
     db.add(execution)
     db.commit()
     db.refresh(execution)
     return execution
+
+
+def to_execution_out(execution: Execution) -> dict:
+    return {
+        "id": execution.id,
+        "status": execution.status,
+        "started_at": execution.started_at,
+        "finished_at": execution.finished_at,
+        "target_machine": execution.machine.alias if execution.machine else None,
+    }
+
+
+def to_task_result_out(result) -> dict:
+    return {
+        "id": result.id,
+        "task_name": result.task.name,
+        "status": result.status,
+        "return_code": result.return_code,
+        "command": result.command,
+        "machine_alias": result.machine_alias,
+        "machine_host": result.machine_host,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "started_at": result.started_at,
+        "finished_at": result.finished_at,
+    }
 
 
 def to_workflow_out(workflow: Workflow) -> dict:
@@ -124,5 +164,6 @@ def to_workflow_detail(workflow: Workflow) -> dict:
             "target": t.machine.alias,
             "order_index": t.order_index,
             "condition": condition,
+            "timeout_seconds": t.timeout_seconds,
         })
     return {**to_workflow_out(workflow), "tasks": tasks_out}

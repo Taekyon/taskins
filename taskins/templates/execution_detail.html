@@ -10,18 +10,21 @@
 <p class="muted" style="font-size:12px;">
   Débutée <span class="mono">{{ execution.started_at or "—" }}</span> ·
   Terminée <span class="mono">{{ execution.finished_at or "—" }}</span>
+  {% if execution.machine %} · Redirigée vers <span class="mono">{{ execution.machine.alias }}</span>{% endif %}
 </p>
 
 <h2>Tâches</h2>
 <table class="data-table">
   <thead>
-    <tr><th>#</th><th>Tâche</th><th>Statut</th><th>Code retour</th><th>Sortie</th></tr>
+    <tr><th>#</th><th>Tâche</th><th>Commande exécutée</th><th>Machine</th><th>Statut</th><th>Code retour</th><th>Sortie</th></tr>
   </thead>
   <tbody>
     {% for r in task_results %}
     <tr>
       <td class="muted">{{ r.task.order_index }}</td>
       <td>{{ r.task.name }}</td>
+      <td class="mono">{{ r.command or "—" }}</td>
+      <td class="mono">{{ r.machine_alias or "—" }}{% if r.machine_host %} <span class="muted" style="font-size:11px;">{{ r.machine_host }}</span>{% endif %}</td>
       <td>{{ macros.status_pill(r.status) }}</td>
       <td class="mono">{{ r.return_code if r.return_code is not none else "—" }}</td>
       <td>

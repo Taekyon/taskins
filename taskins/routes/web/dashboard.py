@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from taskins.core.database import get_db
+from taskins.core.config import settings
 from taskins.core.dependencies import require_user_web
 from taskins.core.templates import templates
 from taskins.models.user import User
@@ -39,6 +40,7 @@ def new_workflow_page(
     return templates.TemplateResponse(request, "workflow_new.html", {
         "user": user,
         "machines": machines,
+        "default_timeout": settings.default_task_timeout,
     })
 
 
@@ -61,6 +63,8 @@ def workflow_detail_page(
         "workflow": workflow,
         "tasks": detail["tasks"],
         "executions": executions,
+        "machines": machine_service.list_machines(db),
+        "default_timeout": settings.default_task_timeout,
     })
 
 

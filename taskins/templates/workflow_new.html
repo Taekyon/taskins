@@ -49,8 +49,15 @@
       <label>Commande</label>
       <input type="text" class="task-command mono" required>
     </div>
+    <div class="field" style="display:flex; gap:12px;">
+      <div style="flex:1;">
+        <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px;">Timeout (s) — vide = défaut système</label>
+        <input type="number" class="task-timeout" min="1" placeholder="{{ default_timeout }}"
+               style="width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); padding:8px 10px; border-radius:4px; font-size:14px;">
+      </div>
+    </div>
     <div class="field">
-      <label>Cible</label>
+      <label>Cible par défaut</label>
       <select class="task-target" required>
         {% for m in machines %}
         <option value="{{ m.alias }}">{{ m.alias }} ({{ m.host }})</option>
@@ -94,11 +101,13 @@ document.getElementById('workflow-form').addEventListener('submit', async (e) =>
 
   const tasks = [...container.querySelectorAll('.task-row')].map(row => {
     const conditionTask = row.querySelector('.task-condition-task').value.trim();
+    const timeoutRaw = row.querySelector('.task-timeout').value.trim();
     const task = {
       name: row.querySelector('.task-name').value.trim(),
       command: row.querySelector('.task-command').value.trim(),
       target: row.querySelector('.task-target').value,
       condition: null,
+      timeout_seconds: timeoutRaw ? parseInt(timeoutRaw, 10) : null,
     };
     if (conditionTask) {
       task.condition = {
