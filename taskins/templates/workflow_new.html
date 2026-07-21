@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Nouveau workflow — Taskins{% endblock %}
+{% block content %}
+<p class="muted"><a href="/workflows">&larr; Workflows</a></p>
+<h1>Nouveau workflow</h1>
+
+<div id="error-banner" class="error-box" style="display:none;"></div>
+
+<form id="workflow-form">
+  <div class="field">
+    <label for="wf-name">Nom</label>
+    <input type="text" id="wf-name" required>
+  </div>
+  <div class="field">
+    <label for="wf-description">Description (optionnelle)</label>
+    <input type="text" id="wf-description">
+  </div>
+
+  <h2>Tâches</h2>
+  <div id="tasks-container"></div>
+  <button type="button" class="btn" id="add-task-btn"
+    style="background:var(--surface); color:var(--text); border:1px solid var(--border);">
+    + Ajouter une tâche
+  </button>
+
+  <div style="margin-top:28px;">
+    {% if machines %}
+    <button type="submit" class="btn">Créer le workflow</button>
+    {% else %}
+    <p class="muted">Aucune machine enregistrée — ajoute-en une via <a href="/docs">/docs</a> avant de créer un workflow.</p>
+    {% endif %}
+  </div>
+</form>
+
+<template id="task-row-template">
+  <div class="task-row" style="border:1px solid var(--border); border-radius:6px; padding:14px; margin-bottom:12px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline;">
+      <span class="muted" style="font-size:12px;">Tâche</span>
+      <button type="button" class="remove-task-btn"
+        style="background:none;border:none;color:var(--status-failed);cursor:pointer;font-size:12px;">
+        retirer
+      </button>
+    </div>
+    <div class="field">
+      <label>Nom</label>
+      <input type="text" class="task-name" required>
+    </div>
+    <div class="field">
+      <label>Commande</label>
+      <input type="text" class="task-command mono" required>
+    </div>
+    <div class="field">
+      <label>Cible</label>
+      <select class="task-target" required>
+        {% for m in machines %}
+        <option value="{{ m.alias }}">{{ m.alias }} ({{ m.host }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:flex; gap:12px;">
+      <div class="field" style="flex:1;">
+        <label>Condition — nom de la tâche antérieure (optionnel)</label>
+        <input type="text" class="task-condition-task">
+      </div>
+      <div class="field" style="width:140px;">
+        <label>Code de retour attendu</label>
+        <input type="number" class="task-condition-code" value="0">
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+const container = document.getElementById('tasks-container');
+const rowTemplate = document.getElementById('task-row-template');
+
+function addTaskRow() {
+  const clone = rowTemplate.content.cloneNode(true);
+  clone.querySelector('.remove-task-btn').addEventListener('click', (e) => {
+    if (container.children.length > 1) {
+      e.target.closest('.task-row').remove();
+    }
+  });
+  container.appendChild(clone);
+}
+
+document.getElementById('add-task-btn').addEventListener('click', addTaskRow);
+addTaskRow();
+
+document.getElementById('workflow-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorBanner = document.getElementById('error-banner');
+  errorBanner.style.display = 'none';
+
+  const tasks = [...container.querySelectorAll('.task-row')].map(row => {
+    const conditionTask = row.querySelector('.task-condition-task').value.trim();
+    const task = {
+      name: row.querySelector('.task-name').value.trim(),
+      command: row.querySelector('.task-command').value.trim(),
+      target: row.querySelector('.task-target').value,
+      condition: null,
+    };
+    if (conditionTask) {
+      task.condition = {
+        task: conditionTask,
+        return_code: parseInt(row.querySelector('.task-condition-code').value || '0', 10),
+      };
+    }
+    return task;
+  });
+
+  const payload = {
+    name: document.getElementById('wf-name').value.trim(),
+    description: document.getElementById('wf-description').value.trim() || null,
+    tasks: tasks,
+  };
+
+  const res = await fetch('/api/v1/workflows', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify(payload),
+  });
+
+  if (res.ok) {
+    const data = await res.json();
+    window.location = '/workflows/' + data.id;
+  } else {
+    const err = await res.json().catch(() => ({ detail: 'Erreur inconnue' }));
+    errorBanner.textContent = Array.isArray(err.detail)
+      ? err.detail.map(d => d.msg.replace(/^Value error,\s*/, '')).join(' — ')
+      : err.detail;
+    errorBanner.style.display = 'block';
+  }
+});
+</script>
+{% endblock %}

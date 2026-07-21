@@ -37,4 +37,11 @@
     {% endfor %}
   </tbody>
 </table>
+
+{% if execution.status in ['PENDING', 'RUNNING'] %}
+<script>
+// Exécution encore active : on recharge toutes les 5s jusqu'à DONE/FAILED.
+setInterval(() => location.reload(), 5000);
+</script>
+{% endif %}
 {% endblock %}

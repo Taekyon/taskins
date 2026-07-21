@@ -12,7 +12,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 # Récupération des identifiants d'admin depuis le fichier .env.dev
-ADMIN_USER=$(grep -E '^TASKINS_BOOTSTRAP_ADMIN_USERNAME=' "$ENV_FILE" | cut -d '=' -f2-)
+ADMIN_USER=$(grep -E '^TASKINS_BOOTSTRAP_ADMIN_USERNAME=' "$ENV_FILE" | cut -d '=' -f2- | sed "s/^['\"]//;s/['\"]$//")
 ADMIN_PASS=$(grep -E '^TASKINS_BOOTSTRAP_ADMIN_PASSWORD=' "$ENV_FILE" | cut -d '=' -f2- | sed "s/^['\"]//;s/['\"]$//")
 
 if [ -z "$ADMIN_USER" ] || [ -z "$ADMIN_PASS" ]; then
@@ -20,18 +20,23 @@ if [ -z "$ADMIN_USER" ] || [ -z "$ADMIN_PASS" ]; then
   exit 1
 fi
 
+
+# --noproxy '*' : ce trafic reste local à la VM (l'app elle-même), il ne doit
+# jamais transiter par la passerelle proxy de l'entreprise (Zscaler), quelle
+# que soit la configuration proxy de la session shell.
+CURL_OPTS="--noproxy *"
  
 echo "--- 1. Login ($ADMIN_USER) ---"
-curl -s -c "$COOKIE_JAR" -o /dev/null -w "status: %{http_code}\n" \
+curl -s $CURL_OPTS -c "$COOKIE_JAR" -o /dev/null -w "status: %{http_code}\n" \
   -X POST "$BASE_URL/login" \
   -d "username=$ADMIN_USER&password=$ADMIN_PASS"
 
 echo "--- 2. Création du workflow (3 tâches, conditions en chaîne) ---"
-RESPONSE=$(curl -s -b "$COOKIE_JAR" -w "\n%{http_code}" \
+RESPONSE=$(curl -s $CURL_OPTS -b "$COOKIE_JAR" -w "\n%{http_code}" \
   -X POST "$BASE_URL/api/v1/workflows" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "selfping",
+    "name": "self ping",
     "description": "test manuel",
     "tasks": [
       {"name": "verifier_connectivite", "command": "ping -c 3 127.0.0.1", "target": "worker-1"}
@@ -46,15 +51,15 @@ WF_ID=$(echo "$BODY" | grep -o '"id":[0-9]*' | head -n1 | grep -o '[0-9]*')
 echo "workflow_id extrait : $WF_ID"
 
 echo "--- 3. Soumission (DRAFT -> PENDING) ---"
-curl -s -b "$COOKIE_JAR" -w "\nstatus: %{http_code}\n" \
+curl -s $CURL_OPTS -b "$COOKIE_JAR" -w "\nstatus: %{http_code}\n" \
   -X POST "$BASE_URL/api/v1/workflows/$WF_ID/submit"
 
 echo "--- 4. Exécution (crée une ligne executions) ---"
-curl -s -b "$COOKIE_JAR" -w "\nstatus: %{http_code}\n" \
+curl -s $CURL_OPTS -b "$COOKIE_JAR" -w "\nstatus: %{http_code}\n" \
   -X POST "$BASE_URL/api/v1/workflows/$WF_ID/execute"
 
 echo "--- 5. Historique des exécutions ---"
-curl -s -b "$COOKIE_JAR" -w "\nstatus: %{http_code}\n" \
+curl -s $CURL_OPTS -b "$COOKIE_JAR" -w "\nstatus: %{http_code}\n" \
   "$BASE_URL/api/v1/workflows/$WF_ID/executions"
 
 rm -f "$COOKIE_JAR"

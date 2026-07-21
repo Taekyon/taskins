@@ -4,6 +4,7 @@
 {% block content %}
 <div class="page-header">
   <h1>Workflows</h1>
+  <a href="/workflows/new" class="btn">+ Nouveau workflow</a>
 </div>
 {% if workflows %}
 <table class="data-table">
@@ -23,8 +24,7 @@
 </table>
 {% else %}
 <p class="empty-state">
-  Aucun workflow pour l'instant. Utilise <code class="mono">POST /api/v1/workflows</code>
-  ou <a href="/docs">/docs</a> pour en créer un — le formulaire web arrive à l'étape suivante.
+  Aucun workflow pour l'instant. <a href="/workflows/new">Crée le premier</a>.
 </p>
 {% endif %}
 {% endblock %}

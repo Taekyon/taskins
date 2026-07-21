@@ -6,7 +6,7 @@ from taskins.core.database import get_db
 from taskins.core.dependencies import require_user_web
 from taskins.core.templates import templates
 from taskins.models.user import User
-from taskins.services import workflow_service
+from taskins.services import machine_service, workflow_service
 
 router = APIRouter()
 
@@ -26,6 +26,19 @@ def list_workflows_page(
     return templates.TemplateResponse(request, "workflows_list.html", {
         "user": user,
         "workflows": workflows,
+    })
+
+
+@router.get("/workflows/new")
+def new_workflow_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user_web),
+):
+    machines = machine_service.list_machines(db)
+    return templates.TemplateResponse(request, "workflow_new.html", {
+        "user": user,
+        "machines": machines,
     })
 
 

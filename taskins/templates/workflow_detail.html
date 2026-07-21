@@ -5,8 +5,16 @@
 <p class="muted"><a href="/workflows">&larr; Workflows</a></p>
 <div class="page-header">
   <h1>{{ workflow.name }}</h1>
-  {{ macros.status_pill(workflow.status) }}
+  <div style="display:flex; align-items:center; gap:12px;">
+    {{ macros.status_pill(workflow.status) }}
+    {% if workflow.status == "DRAFT" %}
+    <button class="btn" id="submit-btn">Soumettre</button>
+    {% elif workflow.status == "PENDING" %}
+    <button class="btn" id="execute-btn">Exécuter</button>
+    {% endif %}
+  </div>
 </div>
+<div id="action-error" class="error-box" style="display:none;"></div>
 {% if workflow.description %}<p class="muted">{{ workflow.description }}</p>{% endif %}
 <p class="muted" style="font-size:12px;">
   Propriétaire : {{ workflow.owner.username }} · Groupe : {{ workflow.group.name }} · Créé le
@@ -55,4 +63,32 @@
 {% else %}
 <p class="empty-state">Aucune exécution pour l'instant.</p>
 {% endif %}
+
+<script>
+async function postAction(url) {
+  const errorBox = document.getElementById('action-error');
+  errorBox.style.display = 'none';
+  const res = await fetch(url, { method: 'POST', credentials: 'same-origin' });
+  if (res.ok) {
+    location.reload();
+  } else {
+    const err = await res.json().catch(() => ({ detail: 'Erreur inconnue' }));
+    errorBox.textContent = Array.isArray(err.detail)
+      ? err.detail.map(d => d.msg).join(' — ')
+      : err.detail;
+    errorBox.style.display = 'block';
+  }
+}
+const submitBtn = document.getElementById('submit-btn');
+if (submitBtn) submitBtn.addEventListener('click', () => postAction('/api/v1/workflows/{{ workflow.id }}/submit'));
+const executeBtn = document.getElementById('execute-btn');
+if (executeBtn) executeBtn.addEventListener('click', () => postAction('/api/v1/workflows/{{ workflow.id }}/execute'));
+
+{% set active_executions = executions | selectattr('status', 'in', ['PENDING', 'RUNNING']) | list %}
+{% if active_executions %}
+// Au moins une exécution est PENDING/RUNNING : le moteur la traite en tâche de
+// fond. On recharge toutes les 5s jusqu'à ce qu'elle passe DONE/FAILED.
+setInterval(() => location.reload(), 5000);
+{% endif %}
+</script>
 {% endblock %}
