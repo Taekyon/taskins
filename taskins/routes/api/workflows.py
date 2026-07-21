@@ -19,8 +19,15 @@ router = APIRouter(prefix="/api/v1/workflows", tags=["workflows"])
 
 
 @router.get("", response_model=list[WorkflowOut])
-def list_workflows(db: Session = Depends(get_db), _user: User = Depends(require_user_api)):
-    return [workflow_service.to_workflow_out(w) for w in workflow_service.list_workflows(db)]
+def list_workflows(
+    include_archived: bool = False,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_user_api),
+):
+    return [
+        workflow_service.to_workflow_out(w)
+        for w in workflow_service.list_workflows(db, include_archived=include_archived)
+    ]
 
 
 @router.post("", response_model=WorkflowDetailOut, status_code=201)
@@ -105,3 +112,41 @@ def list_task_results(
         raise HTTPException(status_code=404, detail="Exécution introuvable")
     results = sorted(execution.task_results, key=lambda r: r.task.order_index)
     return [workflow_service.to_task_result_out(r) for r in results]
+
+
+def _get_owned_or_admin(db: Session, workflow_id: int, user: User):
+    """Un workflow n'est archivable/supprimable que par son propriétaire ou un
+    administrateur — même si la visibilité en lecture reste ouverte en V1."""
+    workflow = workflow_service.get_workflow(db, workflow_id)
+    if workflow is None:
+        raise HTTPException(status_code=404, detail="Workflow introuvable")
+    if workflow.owner_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail="Seul le propriétaire ou un administrateur")
+    return workflow
+
+
+@router.post("/{workflow_id}/archive", response_model=WorkflowOut)
+def archive_workflow(workflow_id: int, db: Session = Depends(get_db), user: User = Depends(require_user_api)):
+    workflow = _get_owned_or_admin(db, workflow_id, user)
+    try:
+        workflow = workflow_service.archive_workflow(db, workflow)
+    except WorkflowValidationError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return workflow_service.to_workflow_out(workflow)
+
+
+@router.post("/{workflow_id}/unarchive", response_model=WorkflowOut)
+def unarchive_workflow(workflow_id: int, db: Session = Depends(get_db), user: User = Depends(require_user_api)):
+    workflow = _get_owned_or_admin(db, workflow_id, user)
+    try:
+        workflow = workflow_service.unarchive_workflow(db, workflow)
+    except WorkflowValidationError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return workflow_service.to_workflow_out(workflow)
+
+
+@router.delete("/{workflow_id}", status_code=204)
+def delete_workflow(workflow_id: int, db: Session = Depends(get_db), user: User = Depends(require_user_api)):
+    """Suppression définitive : emporte tâches, exécutions et historique."""
+    workflow = _get_owned_or_admin(db, workflow_id, user)
+    workflow_service.delete_workflow(db, workflow)

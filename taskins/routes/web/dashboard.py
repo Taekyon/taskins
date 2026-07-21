@@ -20,13 +20,15 @@ def home(_user: User = Depends(require_user_web)):
 @router.get("/workflows")
 def list_workflows_page(
     request: Request,
+    archived: int = 0,
     db: Session = Depends(get_db),
     user: User = Depends(require_user_web),
 ):
-    workflows = workflow_service.list_workflows(db)
+    workflows = workflow_service.list_workflows(db, include_archived=bool(archived))
     return templates.TemplateResponse(request, "workflows_list.html", {
         "user": user,
         "workflows": workflows,
+        "show_archived": bool(archived),
     })
 
 

@@ -18,9 +18,20 @@
     </select>
     <button class="btn" id="execute-btn">Exécuter</button>
     {% endif %}
+    {% if workflow.archived_at %}
+    <button class="link-btn" id="unarchive-btn">désarchiver</button>
+    {% else %}
+    <button class="link-btn" id="archive-btn">archiver</button>
+    {% endif %}
+    <button class="link-btn danger" id="delete-btn">supprimer</button>
   </div>
 </div>
 <div id="action-error" class="error-box" style="display:none;"></div>
+{% if workflow.archived_at %}
+<div style="background:rgba(139,146,163,0.12); border:1px solid var(--border); border-radius:4px; padding:10px 14px; margin-bottom:16px; font-size:13px;" class="muted">
+  Workflow archivé le <span class="mono">{{ workflow.archived_at }}</span> — non exécutable tant qu'il n'est pas désarchivé.
+</div>
+{% endif %}
 {% if workflow.description %}<p class="muted">{{ workflow.description }}</p>{% endif %}
 <p class="muted" style="font-size:12px;">
   Propriétaire : {{ workflow.owner.username }} · Groupe : {{ workflow.group.name }} · Créé le
@@ -96,6 +107,27 @@ async function postAction(url, body) {
 }
 const submitBtn = document.getElementById('submit-btn');
 if (submitBtn) submitBtn.addEventListener('click', () => postAction('/api/v1/workflows/{{ workflow.id }}/submit'));
+const archiveBtn = document.getElementById('archive-btn');
+if (archiveBtn) archiveBtn.addEventListener('click', () => {
+  if (confirm("Archiver ce workflow ?\n\nIl disparaît des listes et n'est plus exécutable, mais tout son historique d'exécutions reste consultable. Réversible."))
+    postAction('/api/v1/workflows/{{ workflow.id }}/archive');
+});
+
+const unarchiveBtn = document.getElementById('unarchive-btn');
+if (unarchiveBtn) unarchiveBtn.addEventListener('click', () => postAction('/api/v1/workflows/{{ workflow.id }}/unarchive'));
+
+const deleteBtn = document.getElementById('delete-btn');
+if (deleteBtn) deleteBtn.addEventListener('click', async () => {
+  if (!confirm("SUPPRIMER DÉFINITIVEMENT ce workflow ?\n\nSes tâches, ses {{ executions|length }} exécution(s) et tout l'historique des résultats seront effacés. Irréversible.\n\nPour conserver l'historique, utiliser « archiver » à la place.")) return;
+  const errorBox = document.getElementById('action-error');
+  errorBox.style.display = 'none';
+  const res = await fetch('/api/v1/workflows/{{ workflow.id }}', { method: 'DELETE', credentials: 'same-origin' });
+  if (res.ok) { window.location = '/workflows'; return; }
+  const err = await res.json().catch(() => ({detail:'Erreur inconnue'}));
+  errorBox.textContent = Array.isArray(err.detail) ? err.detail.map(d => d.msg).join(' — ') : err.detail;
+  errorBox.style.display = 'block';
+});
+
 const executeBtn = document.getElementById('execute-btn');
 if (executeBtn) executeBtn.addEventListener('click', () => {
   const alias = document.getElementById('target-select').value;

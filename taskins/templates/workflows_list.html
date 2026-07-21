@@ -4,7 +4,14 @@
 {% block content %}
 <div class="page-header">
   <h1>Workflows</h1>
-  <a href="/workflows/new" class="btn">+ Nouveau workflow</a>
+  <div style="display:flex; gap:14px; align-items:center;">
+    {% if show_archived %}
+    <a href="/workflows" class="muted" style="font-size:12px;">masquer les archivés</a>
+    {% else %}
+    <a href="/workflows?archived=1" class="muted" style="font-size:12px;">voir les archivés</a>
+    {% endif %}
+    <a href="/workflows/new" class="btn">+ Nouveau workflow</a>
+  </div>
 </div>
 {% if workflows %}
 <table class="data-table">
@@ -14,7 +21,10 @@
   <tbody>
     {% for wf in workflows %}
     <tr>
-      <td><a href="/workflows/{{ wf.id }}">{{ wf.name }}</a></td>
+      <td>
+        <a href="/workflows/{{ wf.id }}">{{ wf.name }}</a>
+        {% if wf.archived_at %}<span class="pill pill-draft" style="margin-left:6px;">archivé</span>{% endif %}
+      </td>
       <td>{{ macros.status_pill(wf.status) }}</td>
       <td>{{ wf.owner.username }}</td>
       <td class="muted mono">{{ wf.created_at }}</td>

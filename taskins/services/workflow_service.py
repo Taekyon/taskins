@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 from taskins.models.execution import Execution
@@ -11,6 +13,10 @@ from taskins.services import machine_service
 
 class WorkflowValidationError(Exception):
     pass
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _default_group(db: Session) -> Group:
@@ -69,9 +75,38 @@ def create_workflow(db: Session, data: WorkflowCreate, owner: User) -> Workflow:
     return workflow
 
 
-def list_workflows(db: Session) -> list[Workflow]:
-    # V1 : pas de filtrage par visibilité (06-controle-acces.md).
-    return db.query(Workflow).order_by(Workflow.created_at.desc()).all()
+def list_workflows(db: Session, include_archived: bool = False) -> list[Workflow]:
+    q = db.query(Workflow)
+    if not include_archived:
+        q = q.filter(Workflow.archived_at.is_(None))
+    return q.order_by(Workflow.created_at.desc()).all()
+
+
+def archive_workflow(db: Session, workflow: Workflow) -> Workflow:
+    """Suppression douce : le workflow disparaît des listes mais son historique
+    d'exécutions reste consultable. Réversible."""
+    if workflow.archived_at is not None:
+        raise WorkflowValidationError("Workflow déjà archivé")
+    workflow.archived_at = _now()
+    db.commit()
+    db.refresh(workflow)
+    return workflow
+
+
+def unarchive_workflow(db: Session, workflow: Workflow) -> Workflow:
+    if workflow.archived_at is None:
+        raise WorkflowValidationError("Workflow non archivé")
+    workflow.archived_at = None
+    db.commit()
+    db.refresh(workflow)
+    return workflow
+
+
+def delete_workflow(db: Session, workflow: Workflow) -> None:
+    """Suppression définitive : emporte les tâches, les exécutions et tout
+    l'historique des résultats. Irréversible."""
+    db.delete(workflow)
+    db.commit()
 
 
 def get_workflow(db: Session, workflow_id: int) -> Workflow | None:
@@ -94,6 +129,8 @@ def execute_workflow(
     """Crée une exécution en attente. `machine_alias` permet de rediriger toutes
     les tâches vers une autre machine sans toucher à la définition du workflow
     (retargeting, option B) — la définition reste immuable."""
+    if workflow.archived_at is not None:
+        raise WorkflowValidationError("Workflow archivé : le désarchiver avant de l'exécuter")
     if workflow.status != "PENDING":
         raise WorkflowValidationError("Seul un workflow approuvé (PENDING) peut être exécuté")
 
@@ -146,6 +183,7 @@ def to_workflow_out(workflow: Workflow) -> dict:
         "owner_id": workflow.owner_id,
         "group_id": workflow.group_id,
         "created_at": workflow.created_at,
+        "archived_at": workflow.archived_at,
     }
 
 

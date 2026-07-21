@@ -31,4 +31,6 @@ class Task(Base):
 
     workflow: Mapped["Workflow"] = relationship("Workflow", back_populates="tasks")  # noqa: F821
     machine: Mapped["Machine"] = relationship("Machine", back_populates="tasks")  # noqa: F821
-    results: Mapped[list["TaskResult"]] = relationship("TaskResult", back_populates="task")  # noqa: F821
+    results: Mapped[list["TaskResult"]] = relationship(  # noqa: F821
+        "TaskResult", back_populates="task", cascade="all, delete-orphan"
+    )

@@ -64,6 +64,7 @@ class WorkflowOut(BaseModel):
     owner_id: int
     group_id: int
     created_at: str
+    archived_at: str | None = None
 
 
 class WorkflowDetailOut(WorkflowOut):

@@ -8,9 +8,11 @@ from starlette.middleware.sessions import SessionMiddleware
 from taskins.core.config import settings
 from taskins.core.database import init_db
 from taskins.core.engine import run_engine_loop
+from taskins.routes.api import groups as api_groups
 from taskins.routes.api import machines as api_machines
 from taskins.routes.api import users as api_users
 from taskins.routes.api import workflows as api_workflows
+from taskins.routes.web import admin as web_admin
 from taskins.routes.web import auth as web_auth
 from taskins.routes.web import dashboard as web_dashboard
 
@@ -43,6 +45,8 @@ app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
 
 app.include_router(web_auth.router)
 app.include_router(web_dashboard.router)
+app.include_router(web_admin.router)
+app.include_router(api_groups.router)
 app.include_router(api_machines.router)
 app.include_router(api_users.router)
 app.include_router(api_workflows.router)
