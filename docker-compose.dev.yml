@@ -1,17 +1,22 @@
 services:
   taskins:
-    build: .
+    build:
+      context: .
+      args:
+        HTTP_PROXY: ${HTTP_PROXY}
+        HTTPS_PROXY: ${HTTPS_PROXY}
+        NO_PROXY: ${NO_PROXY}
     container_name: taskins-app
     env_file: .env.dev
     ports:
-      - "8000:8000"
+      - "80:80"
     volumes:
       - taskins-db-dev:/app/data
       - ./secrets:/app/secrets:ro
       - .:/app
     networks:
       - taskins-net
-    command: uvicorn taskins.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn taskins.main:app --host 0.0.0.0 --port 80 --reload
 
 volumes:
   taskins-db-dev:

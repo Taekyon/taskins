@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Taskins{% endblock %}</title>
+<style>
+  :root {
+    --bg: #0F1115;
+    --surface: #171A21;
+    --surface-hover: #1D212B;
+    --border: #262B36;
+    --text: #E7E9EE;
+    --text-muted: #8B92A3;
+    --accent: #4F8CFF;
+    --accent-dim: rgba(79,140,255,0.14);
+    --status-draft: #8B92A3;
+    --status-pending: #C9A94F;
+    --status-running: #4F8CFF;
+    --status-done: #34D399;
+    --status-failed: #F87171;
+    --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+  }
+  .wordmark {
+    font-family: var(--font-mono); font-weight: 600; color: var(--accent);
+    font-size: 15px; letter-spacing: -0.02em;
+  }
+  .nav-links { display: flex; gap: 20px; align-items: center; }
+  .nav-links a { color: var(--text-muted); font-size: 13px; }
+  .nav-links a.active { color: var(--text); }
+  .nav-user { display: flex; gap: 12px; align-items: center; font-size: 13px; color: var(--text-muted); }
+  .nav-user form { margin: 0; }
+  .nav-user button {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    padding: 5px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; font-family: var(--font-ui);
+  }
+  .nav-user button:hover { border-color: var(--text-muted); color: var(--text); }
+
+  main { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+
+  .page-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0; }
+  h2 { font-size: 15px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 28px 0 12px; }
+
+  .muted { color: var(--text-muted); }
+  .mono { font-family: var(--font-mono); }
+
+  table.data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-muted); font-weight: 500; padding: 8px 12px; border-bottom: 1px solid var(--border);
+  }
+  .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .data-table tr:hover td { background: var(--surface-hover); }
+
+  .pill {
+    display: inline-block; padding: 2px 9px; border-radius: 100px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase;
+  }
+  .pill-draft { color: var(--status-draft); background: rgba(139,146,163,0.14); }
+  .pill-pending-approval, .pill-pending { color: var(--status-pending); background: rgba(201,169,79,0.14); }
+  .pill-running { color: var(--status-running); background: var(--accent-dim); }
+  .pill-done { color: var(--status-done); background: rgba(52,211,153,0.14); }
+  .pill-failed { color: var(--status-failed); background: rgba(248,113,113,0.14); }
+
+  .empty-state { color: var(--text-muted); padding: 24px 0; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; }
+  .field input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 10px; border-radius: 4px; font-family: var(--font-ui); font-size: 14px;
+  }
+  .btn {
+    display: inline-block; background: var(--accent); color: #0B0D11; border: none;
+    padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer;
+    font-family: var(--font-ui);
+  }
+  .btn:hover { opacity: 0.9; text-decoration: none; }
+  .error-box {
+    background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3);
+    color: var(--status-failed); padding: 10px 14px; border-radius: 4px; margin-bottom: 16px; font-size: 13px;
+  }
+
+  pre.output {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 10px 12px; font-family: var(--font-mono); font-size: 12px; overflow-x: auto;
+    white-space: pre-wrap; word-break: break-word; margin: 6px 0 0;
+  }
+  details summary { cursor: pointer; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+{% if user %}
+<nav>
+  <div style="display:flex; align-items:center; gap:32px;">
+    <span class="wordmark">taskins_</span>
+    <div class="nav-links">
+      <a href="/workflows">Workflows</a>
+    </div>
+  </div>
+  <div class="nav-user">
+    <span>{{ user.username }}{% if user.is_admin %} · admin{% endif %}</span>
+    <form method="post" action="/logout"><button type="submit">Se déconnecter</button></form>
+  </div>
+</nav>
+{% endif %}
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

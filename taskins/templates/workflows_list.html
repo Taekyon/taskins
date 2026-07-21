@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block title %}Workflows — Taskins{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Workflows</h1>
+  <a href="/workflows/new" class="btn">+ Nouveau workflow</a>
+</div>
+{% if workflows %}
+<table class="data-table">
+  <thead>
+    <tr><th>Nom</th><th>Statut</th><th>Propriétaire</th><th>Créé le</th></tr>
+  </thead>
+  <tbody>
+    {% for wf in workflows %}
+    <tr>
+      <td><a href="/workflows/{{ wf.id }}">{{ wf.name }}</a></td>
+      <td>{{ macros.status_pill(wf.status) }}</td>
+      <td>{{ wf.owner.username }}</td>
+      <td class="muted mono">{{ wf.created_at }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">
+  Aucun workflow pour l'instant. <a href="/workflows/new">Crée le premier</a>.
+</p>
+{% endif %}
+{% endblock %}
