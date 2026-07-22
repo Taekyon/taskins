@@ -121,27 +121,12 @@
 {% endif %}
 
 <h2>Exécutions</h2>
-{% if executions %}
 <table class="data-table">
   <thead>
     <tr><th>ID</th><th>Statut</th><th>Origine</th><th>Cible</th><th>Débutée</th><th>Terminée</th></tr>
   </thead>
-  <tbody>
-    {% for ex in executions %}
-    <tr>
-      <td><a href="/workflows/{{ workflow.id }}/executions/{{ ex.id }}">#{{ ex.id }}</a></td>
-      <td>{{ macros.status_pill(ex.status) }}</td>
-      <td class="muted" style="font-size:12px;">{% if ex.schedule_id %}planifiée{% else %}manuelle{% endif %}</td>
-      <td class="muted mono">{% if ex.machine %}{{ ex.machine.alias }}{% else %}<span style="font-family:var(--font-ui);">par défaut</span>{% endif %}</td>
-      <td class="muted mono">{{ ex.started_at or "—" }}</td>
-      <td class="muted mono">{{ ex.finished_at or "—" }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
+  {% include "_executions_rows.html" %}
 </table>
-{% else %}
-<p class="empty-state">Aucune exécution pour l'instant.</p>
-{% endif %}
 
 <script>
 async function postAction(url, body) {
@@ -229,11 +214,38 @@ if (executeBtn) executeBtn.addEventListener('click', () => {
   postAction('/api/v1/workflows/{{ workflow.id }}/execute', alias ? { machine: alias } : null);
 });
 
-{% set active_executions = executions | selectattr('status', 'in', ['PENDING', 'RUNNING']) | list %}
-{% if active_executions %}
-// Au moins une exécution est PENDING/RUNNING : le moteur la traite en tâche de
-// fond. On recharge toutes les 5s jusqu'à ce qu'elle passe DONE/FAILED.
-setInterval(() => location.reload(), 5000);
-{% endif %}
+// --- Rafraîchissement partiel ---
+// On ne recharge que le <tbody> des exécutions, pas la page : le défilement,
+// la sélection et les champs du formulaire de planification sont préservés.
+const POLL_MS = 5000;
+let pollTimer = null;
+
+async function refreshExecutions() {
+  if (document.hidden) return;   // onglet en arrière-plan : inutile de solliciter le serveur
+  const current = document.getElementById('executions-body');
+  if (!current) return;
+  try {
+    const res = await fetch('/workflows/{{ workflow.id }}/fragments/executions', { credentials: 'same-origin' });
+    if (!res.ok) return;
+    current.outerHTML = await res.text();
+  } catch (e) {
+    return;   // coupure réseau : on retentera au cycle suivant
+  }
+  const updated = document.getElementById('executions-body');
+  if (updated && updated.dataset.poll !== 'true') {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function startPolling() {
+  const body = document.getElementById('executions-body');
+  if (pollTimer === null && body && body.dataset.poll === 'true') {
+    pollTimer = setInterval(refreshExecutions, POLL_MS);
+  }
+}
+startPolling();
+// Reprise immédiate au retour sur l'onglet, sans attendre le cycle suivant.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshExecutions(); });
 </script>
 {% endblock %}

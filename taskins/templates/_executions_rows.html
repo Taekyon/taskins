@@ -1,0 +1,19 @@
+{% import "_macros.html" as macros %}
+{#- Fragment rechargé seul par le rafraîchissement partiel. `data-poll` indique
+    au JS s'il reste quelque chose à surveiller. -#}
+<tbody id="executions-body" data-poll="{{ 'true' if poll else 'false' }}">
+  {% if executions %}
+    {% for ex in executions %}
+    <tr>
+      <td><a href="/workflows/{{ workflow.id }}/executions/{{ ex.id }}">#{{ ex.id }}</a></td>
+      <td>{{ macros.status_pill(ex.status) }}</td>
+      <td class="muted" style="font-size:12px;">{% if ex.schedule_id %}planifiée{% else %}manuelle{% endif %}</td>
+      <td class="muted mono">{% if ex.machine %}{{ ex.machine.alias }}{% else %}<span style="font-family:var(--font-ui);">par défaut</span>{% endif %}</td>
+      <td class="muted mono">{{ ex.started_at or "—" }}</td>
+      <td class="muted mono">{{ ex.finished_at or "—" }}</td>
+    </tr>
+    {% endfor %}
+  {% else %}
+    <tr><td colspan="6" class="muted" style="padding:18px 12px;">Aucune exécution pour l'instant.</td></tr>
+  {% endif %}
+</tbody>
