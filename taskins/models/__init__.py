@@ -4,5 +4,6 @@ from taskins.models.group import Group  # noqa: F401
 from taskins.models.machine import Machine  # noqa: F401
 from taskins.models.workflow import Workflow  # noqa: F401
 from taskins.models.task import Task  # noqa: F401
+from taskins.models.schedule import Schedule  # noqa: F401
 from taskins.models.execution import Execution  # noqa: F401
 from taskins.models.task_result import TaskResult  # noqa: F401

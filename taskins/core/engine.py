@@ -10,6 +10,7 @@ from taskins.core.ssh_client import SSHInfrastructureError, execute_command
 from taskins.models.execution import Execution
 from taskins.models.task import Task
 from taskins.models.task_result import TaskResult
+from taskins.services import schedule_service
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +21,17 @@ def _now() -> str:
 
 
 def scan_and_process_pending_executions() -> None:
-    """Un cycle du moteur. Fonction synchrone — voir run_engine_loop."""
+    """Un cycle du moteur. Fonction synchrone — voir run_engine_loop.
+
+    Deux temps : d'abord matérialiser les planifications échues en exécutions,
+    puis traiter toutes les exécutions en attente. Dans cet ordre, une
+    occurrence échue part dès le cycle courant."""
     db = SessionLocal()
     try:
+        created = schedule_service.materialize_due_schedules(db)
+        if created:
+            logger.info(f"{created} exécution(s) créée(s) depuis les planifications")
+
         pending_ids = [e.id for e in db.query(Execution).filter_by(status="PENDING").all()]
         for execution_id in pending_ids:
             _process_execution(db, execution_id)

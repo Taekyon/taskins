@@ -7,7 +7,7 @@ from taskins.core.config import settings
 from taskins.core.dependencies import require_user_web
 from taskins.core.templates import templates
 from taskins.models.user import User
-from taskins.services import machine_service, workflow_service
+from taskins.services import machine_service, schedule_service, workflow_service
 
 router = APIRouter()
 
@@ -67,6 +67,11 @@ def workflow_detail_page(
         "executions": executions,
         "machines": machine_service.list_machines(db),
         "default_timeout": settings.default_task_timeout,
+        "schedules": [
+            schedule_service.to_schedule_out(s)
+            for s in schedule_service.list_schedules(db, workflow_id)
+        ],
+        "timezone": settings.timezone,
     })
 
 

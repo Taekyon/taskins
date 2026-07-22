@@ -63,17 +63,75 @@
   </tbody>
 </table>
 
+<h2>Planifications</h2>
+{% if schedules %}
+<table class="data-table">
+  <thead><tr><th>Type</th><th>Règle</th><th>Cible</th><th>Prochaine ({{ timezone }})</th><th>Dernière</th><th>État</th><th style="width:1%"></th></tr></thead>
+  <tbody>
+  {% for s in schedules %}
+    <tr>
+      <td>{{ "ponctuelle" if s.kind == "ONCE" else "récurrente" }}</td>
+      <td class="mono">{{ s.cron_expression or "—" }}</td>
+      <td class="mono">{% if s.target_machine %}{{ s.target_machine }}{% else %}<span style="font-family:var(--font-ui);" class="muted">par défaut</span>{% endif %}</td>
+      <td class="mono">{{ s.next_run_at or "—" }}</td>
+      <td class="mono muted">{{ s.last_run_at or "—" }}</td>
+      <td><span class="pill {% if s.is_active %}pill-done{% else %}pill-draft{% endif %}">{{ "active" if s.is_active else "inactive" }}</span></td>
+      <td style="white-space:nowrap;">
+        {% if s.is_active %}
+        <button class="link-btn" onclick="setSchedule({{ s.id }}, false)">désactiver</button>
+        {% elif s.kind == "CRON" %}
+        <button class="link-btn" onclick="setSchedule({{ s.id }}, true)">réactiver</button>
+        {% endif %}
+        <button class="link-btn danger" onclick="delSchedule({{ s.id }})">supprimer</button>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">Aucune planification.</p>
+{% endif %}
+
+{% if workflow.status == "PENDING" and not workflow.archived_at %}
+<form class="inline-form" onsubmit="return createSchedule(event)">
+  <select id="sc-kind" onchange="toggleScheduleFields()"
+    style="background:var(--surface); border:1px solid var(--border); color:var(--text); padding:7px 10px; border-radius:4px; font-size:13px;">
+    <option value="ONCE">Ponctuelle</option>
+    <option value="CRON">Récurrente (cron)</option>
+  </select>
+  <input type="datetime-local" id="sc-runat"
+    style="background:var(--surface); border:1px solid var(--border); color:var(--text); padding:7px 10px; border-radius:4px; font-size:13px; color-scheme:dark;">
+  <input type="text" id="sc-cron" placeholder="0 2 * * *" class="mono" style="display:none; width:140px;">
+  <select id="sc-machine"
+    style="background:var(--surface); border:1px solid var(--border); color:var(--text); padding:7px 10px; border-radius:4px; font-size:13px;">
+    <option value="">Cibles par défaut</option>
+    {% for m in machines %}<option value="{{ m.alias }}">Tout sur {{ m.alias }}</option>{% endfor %}
+  </select>
+  <button type="submit" class="btn">Planifier</button>
+</form>
+<p class="muted" style="font-size:12px; margin-top:8px;">
+  Heures interprétées dans le fuseau <span class="mono">{{ timezone }}</span>.
+  Format cron : <span class="mono">minute heure jour mois jour-semaine</span> —
+  <span class="mono">0 2 * * *</span> = tous les jours à 2h,
+  <span class="mono">*/15 * * * *</span> = tous les quarts d'heure.
+  Les occurrences manquées pendant un arrêt ne sont pas rattrapées.
+</p>
+{% elif not workflow.archived_at %}
+<p class="muted" style="font-size:12px;">Soumettre le workflow avant de pouvoir le planifier.</p>
+{% endif %}
+
 <h2>Exécutions</h2>
 {% if executions %}
 <table class="data-table">
   <thead>
-    <tr><th>ID</th><th>Statut</th><th>Cible</th><th>Débutée</th><th>Terminée</th></tr>
+    <tr><th>ID</th><th>Statut</th><th>Origine</th><th>Cible</th><th>Débutée</th><th>Terminée</th></tr>
   </thead>
   <tbody>
     {% for ex in executions %}
     <tr>
       <td><a href="/workflows/{{ workflow.id }}/executions/{{ ex.id }}">#{{ ex.id }}</a></td>
       <td>{{ macros.status_pill(ex.status) }}</td>
+      <td class="muted" style="font-size:12px;">{% if ex.schedule_id %}planifiée{% else %}manuelle{% endif %}</td>
       <td class="muted mono">{% if ex.machine %}{{ ex.machine.alias }}{% else %}<span style="font-family:var(--font-ui);">par défaut</span>{% endif %}</td>
       <td class="muted mono">{{ ex.started_at or "—" }}</td>
       <td class="muted mono">{{ ex.finished_at or "—" }}</td>
@@ -107,6 +165,43 @@ async function postAction(url, body) {
 }
 const submitBtn = document.getElementById('submit-btn');
 if (submitBtn) submitBtn.addEventListener('click', () => postAction('/api/v1/workflows/{{ workflow.id }}/submit'));
+function toggleScheduleFields() {
+  const isCron = document.getElementById('sc-kind').value === 'CRON';
+  document.getElementById('sc-cron').style.display = isCron ? '' : 'none';
+  document.getElementById('sc-runat').style.display = isCron ? 'none' : '';
+}
+if (document.getElementById('sc-kind')) toggleScheduleFields();
+
+async function scheduleRequest(url, method, body) {
+  const errorBox = document.getElementById('action-error');
+  errorBox.style.display = 'none';
+  const opts = { method, credentials: 'same-origin' };
+  if (body) { opts.headers = {'Content-Type':'application/json'}; opts.body = JSON.stringify(body); }
+  const res = await fetch(url, opts);
+  if (res.ok) { location.reload(); return; }
+  const err = await res.json().catch(() => ({detail:'Erreur inconnue'}));
+  errorBox.textContent = Array.isArray(err.detail)
+    ? err.detail.map(d => d.msg.replace(/^Value error,\s*/, '')).join(' — ')
+    : err.detail;
+  errorBox.style.display = 'block';
+}
+function createSchedule(e) {
+  e.preventDefault();
+  const kind = document.getElementById('sc-kind').value;
+  const machine = document.getElementById('sc-machine').value;
+  scheduleRequest('/api/v1/workflows/{{ workflow.id }}/schedules', 'POST', {
+    kind: kind,
+    run_at: kind === 'ONCE' ? document.getElementById('sc-runat').value : null,
+    cron_expression: kind === 'CRON' ? document.getElementById('sc-cron').value.trim() : null,
+    machine: machine || null,
+  });
+  return false;
+}
+function setSchedule(id, active) { scheduleRequest('/api/v1/schedules/' + id, 'PATCH', {is_active: active}); }
+function delSchedule(id) {
+  if (confirm('Supprimer cette planification ?')) scheduleRequest('/api/v1/schedules/' + id, 'DELETE');
+}
+
 const archiveBtn = document.getElementById('archive-btn');
 if (archiveBtn) archiveBtn.addEventListener('click', () => {
   if (confirm("Archiver ce workflow ?\n\nIl disparaît des listes et n'est plus exécutable, mais tout son historique d'exécutions reste consultable. Réversible."))

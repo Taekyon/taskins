@@ -15,6 +15,10 @@ class Execution(Base):
     # Retargeting (option B) : NULL = chaque tâche utilise sa machine par défaut.
     # Renseigné = toutes les tâches de cette exécution ciblent cette machine.
     machine_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("machines.id"))
+    # Origine : NULL = lancement manuel, sinon la planification déclenchante.
+    schedule_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("schedules.id", ondelete="SET NULL")
+    )
     status: Mapped[str] = mapped_column(Text, nullable=False, default="PENDING")
     started_at: Mapped[str | None] = mapped_column(Text)
     finished_at: Mapped[str | None] = mapped_column(Text)

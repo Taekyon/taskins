@@ -31,3 +31,6 @@ class Workflow(Base):
     executions: Mapped[list["Execution"]] = relationship(  # noqa: F821
         "Execution", back_populates="workflow", cascade="all, delete-orphan"
     )
+    schedules: Mapped[list["Schedule"]] = relationship(  # noqa: F821
+        "Schedule", back_populates="workflow", cascade="all, delete-orphan"
+    )
