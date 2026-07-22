@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # Fuseau dans lequel les expressions cron et les dates saisies sont
     # interprétées. Le stockage reste en UTC.
-    timezone: str = "Europe/Bern"
+    timezone: str = "Europe/Paris"
 
     # Tolérance avant de considérer une occurrence comme manquée. Au-delà,
     # elle est ignorée sans rattrapage (décision validée) et la planification
