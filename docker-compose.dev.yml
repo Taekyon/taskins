@@ -3,6 +3,7 @@ services:
     build:
       context: .
       args:
+        INSTALL_DEV: "true"
         HTTP_PROXY: ${HTTP_PROXY}
         HTTPS_PROXY: ${HTTPS_PROXY}
         NO_PROXY: ${NO_PROXY}

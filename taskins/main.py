@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Taskins", lifespan=lifespan)
 
-# Session basée sur cookie signé (voir 06-controle-acces.md — gap comblé à l'étape 3).
+# Session basée sur cookie signé (voir 06-controle-acces.md).
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
 
 app.include_router(web_auth.router)
