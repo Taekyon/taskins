@@ -33,6 +33,19 @@ def get_machine(db: Session, machine_id: int) -> Machine | None:
     return db.get(Machine, machine_id)
 
 
+def update_machine(db: Session, machine: Machine, data) -> Machine:
+    """Mise à jour partielle. Nécessaire parce qu'une machine référencée par une
+    tâche ne peut pas être supprimée : sans modification possible, un changement
+    d'adresse IP rendrait le workflow définitivement inutilisable."""
+    for field in ("alias", "host", "ssh_user", "ssh_port"):
+        value = getattr(data, field)
+        if value is not None:
+            setattr(machine, field, value)
+    db.commit()
+    db.refresh(machine)
+    return machine
+
+
 def delete_machine(db: Session, machine: Machine) -> None:
     """Refuse la suppression si la machine est encore référencée : supprimer une
     machine utilisée par une tâche casserait la définition d'un workflow validé,

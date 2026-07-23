@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from taskins.core.database import get_db
 from taskins.core.dependencies import require_admin_api, require_user_api
-from taskins.schemas.machine import MachineCreate, MachineOut
+from taskins.schemas.machine import MachineCreate, MachineOut, MachineUpdate
 from taskins.services import machine_service
 from taskins.services.machine_service import MachineValidationError
 
@@ -24,6 +24,23 @@ def create_machine(
 ):
     try:
         return machine_service.create_machine(db, data)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Alias déjà utilisé")
+
+
+@router.patch("/{machine_id}", response_model=MachineOut)
+def update_machine(
+    machine_id: int,
+    data: MachineUpdate,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin_api),
+):
+    machine = machine_service.get_machine(db, machine_id)
+    if machine is None:
+        raise HTTPException(status_code=404, detail="Machine introuvable")
+    try:
+        return machine_service.update_machine(db, machine, data)
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=409, detail="Alias déjà utilisé")
