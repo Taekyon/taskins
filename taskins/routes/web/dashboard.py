@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from taskins.core.database import get_db
@@ -6,30 +7,14 @@ from taskins.core.config import settings
 from taskins.core.dependencies import require_user_web
 from taskins.core.templates import templates
 from taskins.models.user import User
-from taskins.core import scheduling
-from taskins.services import (
-    dashboard_service,
-    machine_service,
-    schedule_service,
-    workflow_service,
-)
+from taskins.services import machine_service, schedule_service, workflow_service
 
 router = APIRouter()
 
 
 @router.get("/")
-def home(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_user_web),
-):
-    data = dashboard_service.collect(db, user)
-    return templates.TemplateResponse(request, "home.html", {
-        "user": user,
-        "timezone": settings.timezone,
-        "to_local": scheduling.sql_to_local_display,
-        **data,
-    })
+def home(_user: User = Depends(require_user_web)):
+    return RedirectResponse(url="/workflows", status_code=303)
 
 
 @router.get("/workflows")
@@ -113,53 +98,4 @@ def execution_detail_page(
         "workflow": workflow,
         "execution": execution,
         "task_results": task_results,
-    })
-
-
-@router.get("/workflows/{workflow_id}/fragments/executions")
-def executions_fragment(
-    workflow_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_user_web),
-):
-    """Fragment HTML (tbody seul) consommé par le rafraîchissement partiel.
-
-    Rendu côté serveur plutôt que reconstruit en JavaScript : le balisage des
-    lignes n'existe qu'à un seul endroit."""
-    workflow = workflow_service.get_workflow(db, workflow_id)
-    if workflow is None:
-        raise HTTPException(status_code=404, detail="Workflow introuvable")
-
-    executions = sorted(workflow.executions, key=lambda e: e.id, reverse=True)
-    # Continuer à interroger tant qu'une exécution est en cours, ou qu'une
-    # planification active peut en faire apparaître une nouvelle.
-    poll = any(e.status in ("PENDING", "RUNNING") for e in executions) or any(
-        s.is_active and s.next_run_at for s in workflow.schedules
-    )
-    return templates.TemplateResponse(request, "_executions_rows.html", {
-        "workflow": workflow,
-        "executions": executions,
-        "poll": poll,
-    })
-
-
-@router.get("/workflows/{workflow_id}/executions/{execution_id}/fragments/results")
-def results_fragment(
-    workflow_id: int,
-    execution_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_user_web),
-):
-    workflow = workflow_service.get_workflow(db, workflow_id)
-    if workflow is None:
-        raise HTTPException(status_code=404, detail="Workflow introuvable")
-    execution = next((e for e in workflow.executions if e.id == execution_id), None)
-    if execution is None:
-        raise HTTPException(status_code=404, detail="Exécution introuvable")
-
-    return templates.TemplateResponse(request, "_result_rows.html", {
-        "execution": execution,
-        "task_results": sorted(execution.task_results, key=lambda r: r.task.order_index),
     })
