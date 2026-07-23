@@ -1,0 +1,112 @@
+{% import "_macros.html" as macros %}
+{#- Corps de la vue d'ensemble, rechargé seul par le rafraîchissement partiel.
+    `data-poll` indique au JS s'il reste quelque chose à surveiller. -#}
+<div id="home-body" data-poll="{{ 'true' if poll else 'false' }}">
+<div class="tiles">
+  <div class="tile"><span class="tile-value">{{ counts.workflows }}</span><span class="tile-label">workflows actifs</span></div>
+  <div class="tile"><span class="tile-value">{{ counts.schedules }}</span><span class="tile-label">planifications actives</span></div>
+  <div class="tile"><span class="tile-value">{{ counts.running }}</span><span class="tile-label">exécutions en cours</span></div>
+  <div class="tile"><span class="tile-value">{{ counts.executions }}</span><span class="tile-label">exécutions ({{ window_hours }} h)</span></div>
+  <div class="tile {% if counts.failures %}tile-alert{% endif %}">
+    <span class="tile-value">{{ counts.failures }}</span><span class="tile-label">échecs ({{ window_hours }} h)</span>
+  </div>
+</div>
+
+{% if recent_failures %}
+<h2>Échecs récents</h2>
+<table class="data-table">
+  <thead><tr><th>Exécution</th><th>Workflow</th><th>Terminée</th></tr></thead>
+  <tbody>
+  {% for ex in recent_failures %}
+    <tr>
+      <td><a href="/workflows/{{ ex.workflow_id }}/executions/{{ ex.id }}">#{{ ex.id }}</a></td>
+      <td><a href="/workflows/{{ ex.workflow_id }}">{{ ex.workflow.name }}</a></td>
+      <td class="muted mono">{{ to_local(ex.finished_at) or "—" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<div class="columns">
+  <div>
+    <h2>Mes brouillons</h2>
+    {% if drafts %}
+    <table class="data-table">
+      <tbody>
+      {% for wf in drafts %}
+        <tr>
+          <td><a href="/workflows/{{ wf.id }}">{{ wf.name }}</a></td>
+          <td style="text-align:right;">{{ macros.status_pill(wf.status) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted" style="font-size:12px; margin-top:6px;">
+      À soumettre pour devenir exécutables.
+    </p>
+    {% else %}
+    <p class="empty-state">Aucun brouillon.</p>
+    {% endif %}
+  </div>
+
+  <div>
+    <h2>Mes workflows récents</h2>
+    {% if my_workflows %}
+    <table class="data-table">
+      <tbody>
+      {% for wf in my_workflows %}
+        <tr>
+          <td><a href="/workflows/{{ wf.id }}">{{ wf.name }}</a></td>
+          <td style="text-align:right;">{{ macros.status_pill(wf.status) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">Aucun workflow. <a href="/workflows/new">Crée le premier</a>.</p>
+    {% endif %}
+  </div>
+</div>
+
+<h2>Prochaines exécutions planifiées ({{ timezone }})</h2>
+{% if next_schedules %}
+<table class="data-table">
+  <thead><tr><th>Prochaine</th><th>Workflow</th><th>Type</th><th>Règle</th><th>Cible</th></tr></thead>
+  <tbody>
+  {% for s in next_schedules %}
+    <tr>
+      <td class="mono">{{ to_local(s.next_run_at) }}</td>
+      <td><a href="/workflows/{{ s.workflow_id }}">{{ s.workflow.name }}</a></td>
+      <td class="muted">{{ "ponctuelle" if s.kind == "ONCE" else "récurrente" }}</td>
+      <td class="mono muted">{{ s.cron_expression or "—" }}</td>
+      <td class="mono muted">{{ s.machine.alias if s.machine else "par défaut" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">Aucune exécution planifiée.</p>
+{% endif %}
+
+<h2>Dernières exécutions</h2>
+{% if recent_executions %}
+<table class="data-table">
+  <thead><tr><th>ID</th><th>Workflow</th><th>Statut</th><th>Origine</th><th>Débutée</th><th>Terminée</th></tr></thead>
+  <tbody>
+  {% for ex in recent_executions %}
+    <tr>
+      <td><a href="/workflows/{{ ex.workflow_id }}/executions/{{ ex.id }}">#{{ ex.id }}</a></td>
+      <td><a href="/workflows/{{ ex.workflow_id }}">{{ ex.workflow.name }}</a></td>
+      <td>{{ macros.status_pill(ex.status) }}</td>
+      <td class="muted" style="font-size:12px;">{% if ex.schedule_id %}planifiée{% else %}manuelle{% endif %}</td>
+      <td class="muted mono">{{ to_local(ex.started_at) or "—" }}</td>
+      <td class="muted mono">{{ to_local(ex.finished_at) or "—" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">Aucune exécution pour l'instant.</p>
+{% endif %}
+</div>
