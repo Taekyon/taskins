@@ -116,8 +116,12 @@ docker compose -f docker-compose.dev.yml exec taskins pytest
 **Sauvegarde** — toute la base tient dans un fichier. À planifier sur l'hôte :
 
 ```bash
-docker compose exec -T taskins sqlite3 /app/data/taskins.db \
-  ".backup /app/data/backup.db"
+docker compose exec -T taskins python -c "
+import sqlite3
+src = sqlite3.connect('/app/data/taskins.db')
+dst = sqlite3.connect('/app/data/backup.db')
+src.backup(dst); dst.close(); src.close()"
+
 docker cp taskins-app:/app/data/backup.db ./taskins-$(date +%F).db
 ```
 
