@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Mon compte — Taskins{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Mon compte</h1></div>
+
+<p class="muted" style="font-size:13px;">
+  Connecté en tant que <span class="mono">{{ user.username }}</span>{% if user.is_admin %} · administrateur{% endif %}.
+</p>
+
+<h2>Changer mon mot de passe</h2>
+<div id="pw-error" class="error-box" style="display:none;"></div>
+<div id="pw-ok" style="display:none; background:rgba(52,211,153,0.1); border:1px solid rgba(52,211,153,0.3); color:var(--status-done); padding:10px 14px; border-radius:4px; margin-bottom:16px; font-size:13px;">
+  Mot de passe modifié.
+</div>
+
+<form onsubmit="return changePassword(event)" style="max-width:340px;">
+  <div class="field">
+    <label for="pw-current">Mot de passe actuel</label>
+    <input type="password" id="pw-current" required autocomplete="current-password">
+  </div>
+  <div class="field">
+    <label for="pw-new">Nouveau mot de passe (8 caractères minimum)</label>
+    <input type="password" id="pw-new" minlength="8" required autocomplete="new-password">
+  </div>
+  <div class="field">
+    <label for="pw-confirm">Confirmer</label>
+    <input type="password" id="pw-confirm" minlength="8" required autocomplete="new-password">
+  </div>
+  <button type="submit" class="btn">Modifier</button>
+</form>
+
+<script>
+async function changePassword(e) {
+  e.preventDefault();
+  const erreur = document.getElementById('pw-error');
+  const succes = document.getElementById('pw-ok');
+  erreur.style.display = 'none';
+  succes.style.display = 'none';
+
+  const nouveau = document.getElementById('pw-new').value;
+  if (nouveau !== document.getElementById('pw-confirm').value) {
+    erreur.textContent = 'Les deux saisies ne correspondent pas.';
+    erreur.style.display = 'block';
+    return false;
+  }
+
+  const res = await fetch('/api/v1/users/me/password', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    credentials: 'same-origin',
+    body: JSON.stringify({
+      current_password: document.getElementById('pw-current').value,
+      new_password: nouveau,
+    }),
+  });
+
+  if (res.ok) {
+    document.querySelector('form').reset();
+    succes.style.display = 'block';
+  } else {
+    const err = await res.json().catch(() => ({detail: 'Erreur inconnue'}));
+    erreur.textContent = Array.isArray(err.detail)
+      ? err.detail.map(d => d.msg.replace(/^Value error,\s*/, '')).join(' — ')
+      : err.detail;
+    erreur.style.display = 'block';
+  }
+  return false;
+}
+</script>
+{% endblock %}

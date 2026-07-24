@@ -17,6 +17,7 @@
         </span>
       </td>
       <td style="white-space:nowrap;">
+        <button class="link-btn" onclick="resetPassword({{ u.id }}, '{{ u.username }}')">mot de passe</button>
         <button class="link-btn" onclick="patchAdmin({{ u.id }}, {{ 'false' if u.is_admin else 'true' }})">
           {{ "retirer admin" if u.is_admin else "passer admin" }}
         </button>
@@ -101,6 +102,12 @@ async function send(url, method, body) {
   showError(Array.isArray(err.detail) ? err.detail.map(d => d.msg).join(' — ') : err.detail);
 }
 function del(url, confirmMsg) { if (confirm(confirmMsg)) send(url, 'DELETE'); }
+function resetPassword(id, nom) {
+  const nouveau = prompt("Nouveau mot de passe pour " + nom + " (8 caractères minimum) :");
+  if (nouveau === null) return;
+  if (nouveau.length < 8) { showError("Mot de passe trop court (8 caractères minimum)."); return; }
+  send('/api/v1/users/' + id, 'PATCH', {password: nouveau});
+}
 function patchAdmin(id, value) { send('/api/v1/users/' + id, 'PATCH', {is_admin: value}); }
 function createUser(e) {
   e.preventDefault();

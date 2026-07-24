@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from taskins.core.database import get_db
 from taskins.core.dependencies import require_admin_api
-from taskins.schemas.user import UserCreate, UserOut, UserUpdate
+from taskins.schemas.user import PasswordChange, UserCreate, UserOut, UserUpdate
 from taskins.core.dependencies import require_user_api  # noqa: F401
 from taskins.models.user import User
 from taskins.services import user_service
@@ -31,6 +31,20 @@ def create_user(
         raise HTTPException(status_code=409, detail="Nom d'utilisateur déjà utilisé")
 
 
+@router.post("/me/password", status_code=204)
+def change_own_password(
+    data: PasswordChange,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user_api),
+):
+    """Déclarée avant /{user_id} : sinon FastAPI tenterait de convertir 'me'
+    en entier et renverrait une erreur de validation."""
+    try:
+        user_service.change_own_password(db, user, data.current_password, data.new_password)
+    except UserValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
 @router.patch("/{user_id}", response_model=UserOut)
 def update_user_admin_flag(
     user_id: int,
@@ -41,7 +55,11 @@ def update_user_admin_flag(
     user = user_service.get_user(db, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
-    return user_service.set_admin(db, user, data.is_admin)
+    if data.password is not None:
+        user_service.set_password(db, user, data.password)
+    if data.is_admin is not None:
+        user_service.set_admin(db, user, data.is_admin)
+    return user
 
 
 @router.delete("/{user_id}", status_code=204)

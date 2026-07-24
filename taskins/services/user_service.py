@@ -1,8 +1,12 @@
 from sqlalchemy.orm import Session
 
-from taskins.core.security import hash_password
+from taskins.core.security import hash_password, verify_password
 from taskins.models.user import User
 from taskins.schemas.user import UserCreate
+
+
+class UserValidationError(Exception):
+    pass
 
 
 def list_users(db: Session) -> list[User]:
@@ -25,15 +29,26 @@ def create_user(db: Session, data: UserCreate) -> User:
     return user
 
 
-def set_admin(db: Session, user: User, is_admin: bool) -> User:
-    user.is_admin = int(is_admin)
+def set_password(db: Session, user: User, new_password: str) -> User:
+    user.password_hash = hash_password(new_password)
     db.commit()
     db.refresh(user)
     return user
 
 
-class UserValidationError(Exception):
-    pass
+def change_own_password(db: Session, user: User, current: str, new: str) -> User:
+    if not verify_password(current, user.password_hash):
+        raise UserValidationError("Mot de passe actuel incorrect")
+    if current == new:
+        raise UserValidationError("Le nouveau mot de passe doit être différent de l'ancien")
+    return set_password(db, user, new)
+
+
+def set_admin(db: Session, user: User, is_admin: bool) -> User:
+    user.is_admin = int(is_admin)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 def delete_user(db: Session, user: User, current_user: User) -> None:

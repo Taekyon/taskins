@@ -87,3 +87,111 @@ def test_groupe_non_vide_protege(admin):
     make_workflow(admin, "wf")
     gid = [g["id"] for g in admin.get("/api/v1/groups").json() if g["name"] == "all"][0]
     assert admin.delete(f"/api/v1/groups/{gid}").status_code == 409
+
+
+# ---------------------------------------------------------------------------
+# Mots de passe
+# ---------------------------------------------------------------------------
+
+
+def test_changement_de_son_propre_mot_de_passe(admin, app_client):
+    r = admin.post("/api/v1/users/me/password",
+                   json={"current_password": "motdepasse-admin", "new_password": "nouveau-mdp-1"})
+    assert r.status_code == 204
+
+    app_client.cookies.clear()
+    ancien = app_client.post("/login", data={"username": "admin", "password": "motdepasse-admin"})
+    assert ancien.status_code == 401, "l'ancien mot de passe ne doit plus fonctionner"
+
+    nouveau = app_client.post("/login",
+                              data={"username": "admin", "password": "nouveau-mdp-1"},
+                              follow_redirects=False)
+    assert nouveau.status_code == 303
+
+
+def test_mot_de_passe_actuel_errone_refuse(admin):
+    r = admin.post("/api/v1/users/me/password",
+                   json={"current_password": "faux", "new_password": "nouveau-mdp-1"})
+    assert r.status_code == 422 and "incorrect" in r.json()["detail"]
+
+
+def test_nouveau_mot_de_passe_identique_refuse(admin):
+    r = admin.post("/api/v1/users/me/password",
+                   json={"current_password": "motdepasse-admin", "new_password": "motdepasse-admin"})
+    assert r.status_code == 422
+
+
+def test_nouveau_mot_de_passe_trop_court_refuse(admin):
+    r = admin.post("/api/v1/users/me/password",
+                   json={"current_password": "motdepasse-admin", "new_password": "court"})
+    assert r.status_code == 422
+
+
+def test_changement_de_mot_de_passe_refuse_aux_anonymes(client):
+    r = client.post("/api/v1/users/me/password",
+                    json={"current_password": "x", "new_password": "motdepasse1"})
+    assert r.status_code == 401
+
+
+def test_route_me_non_capturee_par_l_identifiant(admin):
+    """/me/password est déclarée avant /{user_id} : sans cela, FastAPI
+    tenterait de convertir 'me' en entier."""
+    r = admin.post("/api/v1/users/me/password",
+                   json={"current_password": "motdepasse-admin", "new_password": "nouveau-mdp-1"})
+    assert r.status_code == 204, "la route ne doit pas être interceptée par /{user_id}"
+
+
+def test_un_standard_peut_changer_son_mot_de_passe(user):
+    r = user.post("/api/v1/users/me/password",
+                  json={"current_password": "motdepasse1", "new_password": "nouveau-mdp-1"})
+    assert r.status_code == 204
+
+
+def test_reinitialisation_par_un_administrateur(admin, app_client):
+    """Seul recours pour un utilisateur ayant oublié son mot de passe."""
+    uid = admin.post("/api/v1/users",
+                     json={"username": "oublieux", "password": "motdepasse1"}).json()["id"]
+    assert admin.patch(f"/api/v1/users/{uid}", json={"password": "remis-a-zero-1"}).status_code == 200
+
+    app_client.cookies.clear()
+    r = app_client.post("/login",
+                        data={"username": "oublieux", "password": "remis-a-zero-1"},
+                        follow_redirects=False)
+    assert r.status_code == 303
+
+
+def test_patch_admin_seul_sans_toucher_au_mot_de_passe(admin, app_client):
+    uid = admin.post("/api/v1/users",
+                     json={"username": "promu", "password": "motdepasse1"}).json()["id"]
+    assert admin.patch(f"/api/v1/users/{uid}", json={"is_admin": True}).json()["is_admin"] is True
+
+    app_client.cookies.clear()
+    r = app_client.post("/login",
+                        data={"username": "promu", "password": "motdepasse1"},
+                        follow_redirects=False)
+    assert r.status_code == 303, "le mot de passe ne doit pas avoir changé"
+
+
+def test_reinitialisation_refusee_a_un_standard(admin, app_client):
+    """Ne pas demander les fixtures `admin` et `user` dans le même test : elles
+    partagent un client de scope session, seule la dernière connexion est
+    active."""
+    cible = admin.post("/api/v1/users",
+                       json={"username": "cible", "password": "motdepasse1"}).json()["id"]
+    admin.post("/api/v1/users", json={"username": "curieux", "password": "motdepasse1"})
+
+    app_client.cookies.clear()
+    app_client.post("/login",
+                    data={"username": "curieux", "password": "motdepasse1"},
+                    follow_redirects=False)
+    r = app_client.patch(f"/api/v1/users/{cible}", json={"password": "tentative-1"})
+    assert r.status_code == 403
+
+
+def test_page_mon_compte(admin):
+    r = admin.get("/account")
+    assert r.status_code == 200 and "Changer mon mot de passe" in r.text
+
+
+def test_page_mon_compte_protegee(client):
+    assert client.get("/account", follow_redirects=False).status_code == 303

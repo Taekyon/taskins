@@ -152,7 +152,7 @@
     </div>
   </div>
   <div class="nav-user">
-    <span>{{ user.username }}{% if user.is_admin %} · admin{% endif %}</span>
+    <a href="/account" style="color:var(--text-muted);">{{ user.username }}{% if user.is_admin %} · admin{% endif %}</a>
     <form method="post" action="/logout"><button type="submit">Se déconnecter</button></form>
   </div>
 </nav>

@@ -30,6 +30,11 @@ os.environ["TASKINS_DEFAULT_TASK_TIMEOUT"] = "300"
 os.environ["TASKINS_SCHEDULE_GRACE_SECONDS"] = "60"
 os.environ["TASKINS_SCHEDULER_INTERVAL"] = "86400"
 
+# Le seed n'existe que si l'hôte est renseigné : les tests référencent
+# `worker-1`, ils doivent donc le déclarer explicitement.
+os.environ["TASKINS_SEED_MACHINE_ALIAS"] = "worker-1"
+os.environ["TASKINS_SEED_MACHINE_HOST"] = "192.0.2.10"   # RFC 5737, réservée à la doc
+
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -115,7 +120,13 @@ def admin(app_client):
 
 @pytest.fixture
 def user(app_client, admin):
-    """Client authentifié en tant qu'utilisateur standard."""
+    """Client authentifié en tant qu'utilisateur standard.
+
+    Attention : `admin` et `user` renvoient le MÊME objet client (scope
+    session). Les demander tous les deux dans un test ne donne pas deux sessions
+    simultanées — seule la dernière connexion établie est active. Pour tester
+    deux rôles dans un même test, se reconnecter explicitement via `app_client`.
+    """
     admin.post("/api/v1/users", json={"username": "standard", "password": "motdepasse1"})
     app_client.cookies.clear()
     response = app_client.post(
