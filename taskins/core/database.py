@@ -48,13 +48,15 @@ def _seed(db) -> None:
         if not db.query(Group).filter_by(name="all").first():
             db.add(Group(name="all"))
 
-        if not db.query(Machine).filter_by(alias="worker-1").first():
-            db.add(Machine(
-                alias="worker-1",
-                host="192.168.X.X",
-                ssh_user="svc-taskins",
-                ssh_port=22,
-            ))
+        if settings.seed_machine_host:
+            alias = settings.seed_machine_alias
+            if not db.query(Machine).filter_by(alias=alias).first():
+                db.add(Machine(
+                    alias=alias,
+                    host=settings.seed_machine_host,
+                    ssh_user=settings.seed_machine_ssh_user,
+                    ssh_port=settings.seed_machine_ssh_port,
+                ))
 
         db.commit()
     finally:

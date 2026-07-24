@@ -1,3 +1,5 @@
+# Basé sur le fichier de modèle Python.gitignore de GitHub
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -218,7 +220,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-## AJOUT
+## AJOUT TASKINS ##
 # Clés SSH et secrets
 secrets/
 
