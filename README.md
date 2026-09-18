@@ -176,7 +176,7 @@ aucune tâche ne s'exécute plus.
 
 ## Limites connues
 
-**Contrôle d'accès incomplet.** Tout utilisateur authentifié peut consulter,
+**CONTRÔLE D'ACCÈS INCOMPLET** Tout utilisateur authentifié peut consulter,
 **exécuter** et **planifier** n'importe quel workflow, y compris ceux d'un autre
 utilisateur, et rediriger son exécution vers n'importe quelle machine
 enregistrée. Concrètement, tout compte permet de déclencher des commandes shell
