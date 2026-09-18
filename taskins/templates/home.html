@@ -1,7 +1,42 @@
 {% extends "base.html" %}
 {% block title %}Accueil — Taskins{% endblock %}
 {% block content %}
-<h1>Connecté</h1>
-<p>Utilisateur : {{ user.username }}{% if user.is_admin %} (administrateur){% endif %}</p>
-<form method="post" action="/logout"><button type="submit">Se déconnecter</button></form>
+<div class="page-header">
+  <h1>Vue d'ensemble</h1>
+  <a href="/workflows/new" class="btn">+ Nouveau workflow</a>
+</div>
+
+{% include "_home_body.html" %}
+
+<script>
+// Rafraîchissement partiel de la vue d'ensemble : seul le corps est remplacé,
+// la position de défilement est conservée.
+const POLL_MS = 5000;
+let pollTimer = null;
+
+async function refreshHome() {
+  if (document.hidden) return;
+  const current = document.getElementById('home-body');
+  if (!current) return;
+  try {
+    const res = await fetch('/fragments/home', { credentials: 'same-origin' });
+    if (!res.ok) return;
+    current.outerHTML = await res.text();
+  } catch (e) {
+    return;   // coupure réseau : nouvelle tentative au cycle suivant
+  }
+  const updated = document.getElementById('home-body');
+  if (!updated) return;
+  if (updated.dataset.poll !== 'true') {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  } else if (pollTimer === null) {
+    pollTimer = setInterval(refreshHome, POLL_MS);   // reprise si l'activité repart
+  }
+}
+
+const homeBody = document.getElementById('home-body');
+if (homeBody && homeBody.dataset.poll === 'true') pollTimer = setInterval(refreshHome, POLL_MS);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshHome(); });
+</script>
 {% endblock %}

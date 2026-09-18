@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 from taskins.models.execution import Execution
@@ -11,6 +13,10 @@ from taskins.services import machine_service
 
 class WorkflowValidationError(Exception):
     pass
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _default_group(db: Session) -> Group:
@@ -51,6 +57,7 @@ def create_workflow(db: Session, data: WorkflowCreate, owner: User) -> Workflow:
             command=task_in.command,
             machine_id=machines_by_alias[task_in.target].id,
             order_index=index,
+            timeout_seconds=task_in.timeout_seconds,
         )
         db.add(task)
         db.flush()
@@ -68,9 +75,38 @@ def create_workflow(db: Session, data: WorkflowCreate, owner: User) -> Workflow:
     return workflow
 
 
-def list_workflows(db: Session) -> list[Workflow]:
-    # V1 : pas de filtrage par visibilité (06-controle-acces.md).
-    return db.query(Workflow).order_by(Workflow.created_at.desc()).all()
+def list_workflows(db: Session, include_archived: bool = False) -> list[Workflow]:
+    q = db.query(Workflow)
+    if not include_archived:
+        q = q.filter(Workflow.archived_at.is_(None))
+    return q.order_by(Workflow.created_at.desc()).all()
+
+
+def archive_workflow(db: Session, workflow: Workflow) -> Workflow:
+    """Suppression douce : le workflow disparaît des listes mais son historique
+    d'exécutions reste consultable. Réversible."""
+    if workflow.archived_at is not None:
+        raise WorkflowValidationError("Workflow déjà archivé")
+    workflow.archived_at = _now()
+    db.commit()
+    db.refresh(workflow)
+    return workflow
+
+
+def unarchive_workflow(db: Session, workflow: Workflow) -> Workflow:
+    if workflow.archived_at is None:
+        raise WorkflowValidationError("Workflow non archivé")
+    workflow.archived_at = None
+    db.commit()
+    db.refresh(workflow)
+    return workflow
+
+
+def delete_workflow(db: Session, workflow: Workflow) -> None:
+    """Suppression définitive : emporte les tâches, les exécutions et tout
+    l'historique des résultats. Irréversible."""
+    db.delete(workflow)
+    db.commit()
 
 
 def get_workflow(db: Session, workflow_id: int) -> Workflow | None:
@@ -87,14 +123,55 @@ def submit_workflow(db: Session, workflow: Workflow) -> Workflow:
     return workflow
 
 
-def execute_workflow(db: Session, workflow: Workflow) -> Execution:
+def execute_workflow(
+    db: Session, workflow: Workflow, machine_alias: str | None = None
+) -> Execution:
+    """Crée une exécution en attente. `machine_alias` permet de rediriger toutes
+    les tâches vers une autre machine sans toucher à la définition du workflow
+    (retargeting, option B) — la définition reste immuable."""
+    if workflow.archived_at is not None:
+        raise WorkflowValidationError("Workflow archivé : le désarchiver avant de l'exécuter")
     if workflow.status != "PENDING":
         raise WorkflowValidationError("Seul un workflow approuvé (PENDING) peut être exécuté")
-    execution = Execution(workflow_id=workflow.id, status="PENDING")
+
+    machine_id = None
+    if machine_alias:
+        machine = machine_service.get_machine_by_alias(db, machine_alias)
+        if machine is None:
+            raise WorkflowValidationError(f"Machine cible inconnue : '{machine_alias}'")
+        machine_id = machine.id
+
+    execution = Execution(workflow_id=workflow.id, status="PENDING", machine_id=machine_id)
     db.add(execution)
     db.commit()
     db.refresh(execution)
     return execution
+
+
+def to_execution_out(execution: Execution) -> dict:
+    return {
+        "id": execution.id,
+        "status": execution.status,
+        "started_at": execution.started_at,
+        "finished_at": execution.finished_at,
+        "target_machine": execution.machine.alias if execution.machine else None,
+    }
+
+
+def to_task_result_out(result) -> dict:
+    return {
+        "id": result.id,
+        "task_name": result.task.name,
+        "status": result.status,
+        "return_code": result.return_code,
+        "command": result.command,
+        "machine_alias": result.machine_alias,
+        "machine_host": result.machine_host,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "started_at": result.started_at,
+        "finished_at": result.finished_at,
+    }
 
 
 def to_workflow_out(workflow: Workflow) -> dict:
@@ -106,6 +183,7 @@ def to_workflow_out(workflow: Workflow) -> dict:
         "owner_id": workflow.owner_id,
         "group_id": workflow.group_id,
         "created_at": workflow.created_at,
+        "archived_at": workflow.archived_at,
     }
 
 
@@ -124,5 +202,6 @@ def to_workflow_detail(workflow: Workflow) -> dict:
             "target": t.machine.alias,
             "order_index": t.order_index,
             "condition": condition,
+            "timeout_seconds": t.timeout_seconds,
         })
     return {**to_workflow_out(workflow), "tasks": tasks_out}

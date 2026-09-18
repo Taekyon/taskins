@@ -5,43 +5,72 @@
 <p class="muted"><a href="/workflows/{{ workflow.id }}">&larr; {{ workflow.name }}</a></p>
 <div class="page-header">
   <h1>Exécution #{{ execution.id }}</h1>
-  {{ macros.status_pill(execution.status) }}
+  <span id="exec-status">{{ macros.status_pill(execution.status) }}</span>
 </div>
 <p class="muted" style="font-size:12px;">
-  Débutée <span class="mono">{{ execution.started_at or "—" }}</span> ·
-  Terminée <span class="mono">{{ execution.finished_at or "—" }}</span>
+  Débutée <span class="mono" id="exec-started">{{ execution.started_at or "—" }}</span> ·
+  Terminée <span class="mono" id="exec-finished">{{ execution.finished_at or "—" }}</span>
+  {% if execution.schedule_id %} · déclenchée par une planification{% else %} · lancement manuel{% endif %}
+  {% if execution.machine %} · redirigée vers <span class="mono">{{ execution.machine.alias }}</span>{% endif %}
 </p>
 
 <h2>Tâches</h2>
 <table class="data-table">
   <thead>
-    <tr><th>#</th><th>Tâche</th><th>Statut</th><th>Code retour</th><th>Sortie</th></tr>
+    <tr><th>#</th><th>Tâche</th><th>Commande exécutée</th><th>Machine</th><th>Statut</th><th>Code retour</th><th>Sortie</th></tr>
   </thead>
-  <tbody>
-    {% for r in task_results %}
-    <tr>
-      <td class="muted">{{ r.task.order_index }}</td>
-      <td>{{ r.task.name }}</td>
-      <td>{{ macros.status_pill(r.status) }}</td>
-      <td class="mono">{{ r.return_code if r.return_code is not none else "—" }}</td>
-      <td>
-        {% if r.stdout or r.stderr %}
-        <details>
-          <summary>voir</summary>
-          {% if r.stdout %}<pre class="output">{{ r.stdout }}</pre>{% endif %}
-          {% if r.stderr %}<pre class="output" style="color:var(--status-failed);">{{ r.stderr }}</pre>{% endif %}
-        </details>
-        {% else %}<span class="muted">—</span>{% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
+  {% include "_result_rows.html" %}
 </table>
 
-{% if execution.status in ['PENDING', 'RUNNING'] %}
 <script>
-// Exécution encore active : on recharge toutes les 5s jusqu'à DONE/FAILED.
-setInterval(() => location.reload(), 5000);
+// Rafraîchissement partiel : seul le <tbody> est remplacé, ce qui permet de
+// voir les tâches se dérouler sans perdre le défilement ni refermer les
+// blocs de sortie déjà ouverts.
+const POLL_MS = 5000;
+let pollTimer = null;
+
+function applyPill(el, status) {
+  el.innerHTML = '<span class="pill pill-' + status.toLowerCase().replace(/_/g, '-') + '">' + status + '</span>';
+}
+
+async function refreshResults() {
+  if (document.hidden) return;
+  const current = document.getElementById('results-body');
+  if (!current) return;
+
+  // Mémoriser les sorties dépliées pour les rouvrir après remplacement.
+  const opened = [...current.querySelectorAll('details[open]')].map(d => d.id);
+
+  try {
+    const res = await fetch('/workflows/{{ workflow.id }}/executions/{{ execution.id }}/fragments/results',
+                            { credentials: 'same-origin' });
+    if (!res.ok) return;
+    current.outerHTML = await res.text();
+  } catch (e) {
+    return;
+  }
+
+  const updated = document.getElementById('results-body');
+  if (!updated) return;
+  opened.forEach(id => {
+    const d = updated.querySelector('[id="' + id + '"]');
+    if (d) d.open = true;
+  });
+
+  applyPill(document.getElementById('exec-status'), updated.dataset.status);
+  document.getElementById('exec-started').textContent = updated.dataset.started;
+  document.getElementById('exec-finished').textContent = updated.dataset.finished;
+
+  if (updated.dataset.poll !== 'true') {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  } else if (pollTimer === null) {
+    pollTimer = setInterval(refreshResults, POLL_MS);
+  }
+}
+
+const body = document.getElementById('results-body');
+if (body && body.dataset.poll === 'true') pollTimer = setInterval(refreshResults, POLL_MS);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshResults(); });
 </script>
-{% endif %}
 {% endblock %}

@@ -10,6 +10,7 @@ from taskins.core.ssh_client import SSHInfrastructureError, execute_command
 from taskins.models.execution import Execution
 from taskins.models.task import Task
 from taskins.models.task_result import TaskResult
+from taskins.services import schedule_service
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +21,17 @@ def _now() -> str:
 
 
 def scan_and_process_pending_executions() -> None:
-    """Un cycle du moteur. Fonction synchrone — voir run_engine_loop pour
-    l'explication de pourquoi elle est déportée dans un thread."""
+    """Un cycle du moteur. Fonction synchrone — voir run_engine_loop.
+
+    Deux temps : d'abord matérialiser les planifications échues en exécutions,
+    puis traiter toutes les exécutions en attente. Dans cet ordre, une
+    occurrence échue part dès le cycle courant."""
     db = SessionLocal()
     try:
+        created = schedule_service.materialize_due_schedules(db)
+        if created:
+            logger.info(f"{created} exécution(s) créée(s) depuis les planifications")
+
         pending_ids = [e.id for e in db.query(Execution).filter_by(status="PENDING").all()]
         for execution_id in pending_ids:
             _process_execution(db, execution_id)
@@ -48,11 +56,21 @@ def _process_execution(db: Session, execution_id: int) -> None:
     )
 
     for task in tasks:
+        # Retargeting (option B) : la machine portée par l'exécution prime sur
+        # la machine par défaut de la tâche. NULL = comportement d'origine.
+        machine = execution.machine or task.machine
+        timeout = task.timeout_seconds or settings.default_task_timeout
+
+        # Instantané figé dès la création : même si l'exécution échoue juste
+        # après, l'historique sait quoi et où on a tenté d'exécuter.
         task_result = TaskResult(
             execution_id=execution.id,
             task_id=task.id,
             status="RUNNING",
             started_at=_now(),
+            command=task.command,
+            machine_alias=machine.alias,
+            machine_host=machine.host,
         )
         db.add(task_result)
         db.commit()
@@ -78,7 +96,6 @@ def _process_execution(db: Session, execution_id: int) -> None:
                 db.commit()
                 return
 
-        machine = task.machine
         try:
             result = execute_command(
                 host=machine.host,
@@ -86,8 +103,10 @@ def _process_execution(db: Session, execution_id: int) -> None:
                 username=machine.ssh_user,
                 key_path=settings.ssh_key_path,
                 command=task.command,
+                timeout_seconds=timeout,
             )
         except SSHInfrastructureError as e:
+            # Couvre aussi SSHTimeoutError (sous-classe) : timeout = tâche FAILED.
             logger.error(f"Exécution {execution.id}, tâche '{task.name}' : {e}")
             task_result.status = "FAILED"
             task_result.stderr = str(e)
@@ -111,11 +130,10 @@ def _process_execution(db: Session, execution_id: int) -> None:
 
 async def run_engine_loop() -> None:
     """Boucle asyncio de fond. scan_and_process_pending_executions() est
-    entièrement synchrone (SQLAlchemy sync + paramiko, aucun des deux n'est
-    async-natif) : l'exécuter en direct dans cette coroutine bloquerait tout
-    le event loop — donc aussi les requêtes HTTP en cours — pendant chaque
-    connexion SSH. asyncio.to_thread() la déporte dans un thread, ce qui
-    garde le serveur web réactif pendant que le moteur travaille."""
+    entièrement synchrone (SQLAlchemy sync + paramiko) : l'exécuter en direct
+    dans cette coroutine bloquerait le event loop — donc aussi les requêtes
+    HTTP en cours — pendant chaque connexion SSH. asyncio.to_thread() la
+    déporte dans un thread, ce qui garde le serveur web réactif."""
     while True:
         try:
             await asyncio.to_thread(scan_and_process_pending_executions)

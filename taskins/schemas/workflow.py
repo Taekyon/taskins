@@ -11,6 +11,8 @@ class TaskIn(BaseModel):
     command: str = Field(min_length=1)
     target: str = Field(min_length=1)
     condition: ConditionIn | None = None
+    # None = repli sur TASKINS_DEFAULT_TASK_TIMEOUT
+    timeout_seconds: int | None = Field(default=None, gt=0)
 
 
 class WorkflowCreate(BaseModel):
@@ -51,6 +53,7 @@ class TaskOut(BaseModel):
     target: str
     order_index: int
     condition: ConditionOut | None = None
+    timeout_seconds: int | None = None
 
 
 class WorkflowOut(BaseModel):
@@ -61,14 +64,41 @@ class WorkflowOut(BaseModel):
     owner_id: int
     group_id: int
     created_at: str
+    archived_at: str | None = None
 
 
 class WorkflowDetailOut(WorkflowOut):
     tasks: list[TaskOut]
 
 
+class ExecutionCreate(BaseModel):
+    """Corps optionnel de POST /workflows/{id}/execute.
+
+    `machine` : alias d'une machine cible qui remplace, pour cette exécution
+    uniquement, la machine par défaut de chaque tâche (retargeting, option B).
+    Absent ou null = chaque tâche garde sa machine par défaut."""
+
+    machine: str | None = None
+
+
 class ExecutionOut(BaseModel):
     id: int
     status: str
+    started_at: str | None
+    finished_at: str | None
+    # Alias de la machine de retargeting, None si aucune redirection.
+    target_machine: str | None = None
+
+
+class TaskResultOut(BaseModel):
+    id: int
+    task_name: str
+    status: str
+    return_code: int | None
+    command: str | None
+    machine_alias: str | None
+    machine_host: str | None
+    stdout: str | None
+    stderr: str | None
     started_at: str | None
     finished_at: str | None

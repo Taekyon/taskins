@@ -26,7 +26,11 @@ class Task(Base):
     order_index: Mapped[int] = mapped_column(Integer, nullable=False)
     condition_task_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("tasks.id"))
     condition_expected_code: Mapped[int | None] = mapped_column(Integer)
+    # NULL = utiliser TASKINS_DEFAULT_TASK_TIMEOUT
+    timeout_seconds: Mapped[int | None] = mapped_column(Integer)
 
     workflow: Mapped["Workflow"] = relationship("Workflow", back_populates="tasks")  # noqa: F821
     machine: Mapped["Machine"] = relationship("Machine", back_populates="tasks")  # noqa: F821
-    results: Mapped[list["TaskResult"]] = relationship("TaskResult", back_populates="task")  # noqa: F821
+    results: Mapped[list["TaskResult"]] = relationship(  # noqa: F821
+        "TaskResult", back_populates="task", cascade="all, delete-orphan"
+    )

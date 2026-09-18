@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Administration — Taskins{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Administration</h1></div>
+<div id="admin-error" class="error-box" style="display:none;"></div>
+
+<h2>Utilisateurs</h2>
+<table class="data-table">
+  <thead><tr><th>Nom</th><th>Rôle</th><th style="width:1%"></th></tr></thead>
+  <tbody>
+  {% for u in users %}
+    <tr>
+      <td>{{ u.username }}</td>
+      <td>
+        <span class="pill {% if u.is_admin %}pill-running{% else %}pill-draft{% endif %}">
+          {{ "admin" if u.is_admin else "standard" }}
+        </span>
+      </td>
+      <td style="white-space:nowrap;">
+        <button class="link-btn" onclick="resetPassword({{ u.id }}, '{{ u.username }}')">mot de passe</button>
+        <button class="link-btn" onclick="patchAdmin({{ u.id }}, {{ 'false' if u.is_admin else 'true' }})">
+          {{ "retirer admin" if u.is_admin else "passer admin" }}
+        </button>
+        {% if u.id != user.id %}
+        <button class="link-btn danger" onclick="del('/api/v1/users/{{ u.id }}', 'Supprimer {{ u.username }} ?')">supprimer</button>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<form class="inline-form" onsubmit="return createUser(event)">
+  <input type="text" id="nu-name" placeholder="nom d'utilisateur" required>
+  <input type="password" id="nu-pass" placeholder="mot de passe (8+)" minlength="8" required>
+  <label class="chk"><input type="checkbox" id="nu-admin"> admin</label>
+  <button type="submit" class="btn">Ajouter</button>
+</form>
+
+<h2>Machines</h2>
+<table class="data-table">
+  <thead><tr><th>Alias</th><th>Hôte</th><th>Utilisateur SSH</th><th>Port</th><th style="width:1%"></th></tr></thead>
+  <tbody>
+  {% for m in machines %}
+    <tr>
+      <td><input class="cell-input mono" id="m{{ m.id }}-alias" value="{{ m.alias }}" style="width:110px;"></td>
+      <td><input class="cell-input mono" id="m{{ m.id }}-host" value="{{ m.host }}" style="width:150px;"></td>
+      <td><input class="cell-input mono" id="m{{ m.id }}-user" value="{{ m.ssh_user }}" style="width:120px;"></td>
+      <td><input class="cell-input mono" id="m{{ m.id }}-port" type="number" value="{{ m.ssh_port }}" style="width:70px;"></td>
+      <td style="white-space:nowrap;">
+        <button class="link-btn" onclick="saveMachine({{ m.id }})">enregistrer</button>
+        <button class="link-btn danger" onclick="del('/api/v1/machines/{{ m.id }}', 'Supprimer {{ m.alias }} ?')">supprimer</button>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<form class="inline-form" onsubmit="return createMachine(event)">
+  <input type="text" id="nm-alias" placeholder="alias" required>
+  <input type="text" id="nm-host" placeholder="IP ou hostname" required>
+  <input type="text" id="nm-user" placeholder="svc-taskins" value="svc-taskins">
+  <input type="number" id="nm-port" placeholder="22" value="22" style="width:80px;">
+  <button type="submit" class="btn">Ajouter</button>
+</form>
+
+<h2>Groupes</h2>
+<table class="data-table">
+  <thead><tr><th>Nom</th><th style="width:1%"></th></tr></thead>
+  <tbody>
+  {% for g in groups %}
+    <tr>
+      <td class="mono">{{ g.name }}</td>
+      <td>
+        {% if g.name != protected_group %}
+        <button class="link-btn danger" onclick="del('/api/v1/groups/{{ g.id }}', 'Supprimer {{ g.name }} ?')">supprimer</button>
+        {% else %}<span class="muted" style="font-size:12px;">structurant</span>{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<form class="inline-form" onsubmit="return createGroup(event)">
+  <input type="text" id="ng-name" placeholder="nom du groupe" required>
+  <button type="submit" class="btn">Ajouter</button>
+</form>
+<p class="muted" style="font-size:12px; margin-top:8px;">
+  En V1 tous les workflows sont rattachés au groupe <span class="mono">{{ protected_group }}</span> et
+  aucune règle de visibilité n'est appliquée — les autres groupes n'ont pas encore d'effet fonctionnel.
+</p>
+
+<script>
+function showError(msg) {
+  const b = document.getElementById('admin-error');
+  b.textContent = msg; b.style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+async function send(url, method, body) {
+  const opts = { method, credentials: 'same-origin' };
+  if (body) { opts.headers = {'Content-Type':'application/json'}; opts.body = JSON.stringify(body); }
+  const res = await fetch(url, opts);
+  if (res.ok) { location.reload(); return; }
+  const err = await res.json().catch(() => ({detail:'Erreur inconnue'}));
+  showError(Array.isArray(err.detail) ? err.detail.map(d => d.msg).join(' — ') : err.detail);
+}
+function del(url, confirmMsg) { if (confirm(confirmMsg)) send(url, 'DELETE'); }
+function resetPassword(id, nom) {
+  const nouveau = prompt("Nouveau mot de passe pour " + nom + " (8 caractères minimum) :");
+  if (nouveau === null) return;
+  if (nouveau.length < 8) { showError("Mot de passe trop court (8 caractères minimum)."); return; }
+  send('/api/v1/users/' + id, 'PATCH', {password: nouveau});
+}
+function patchAdmin(id, value) { send('/api/v1/users/' + id, 'PATCH', {is_admin: value}); }
+function createUser(e) {
+  e.preventDefault();
+  send('/api/v1/users', 'POST', {
+    username: document.getElementById('nu-name').value.trim(),
+    password: document.getElementById('nu-pass').value,
+    is_admin: document.getElementById('nu-admin').checked,
+  });
+  return false;
+}
+function createMachine(e) {
+  e.preventDefault();
+  send('/api/v1/machines', 'POST', {
+    alias: document.getElementById('nm-alias').value.trim(),
+    host: document.getElementById('nm-host').value.trim(),
+    ssh_user: document.getElementById('nm-user').value.trim() || 'svc-taskins',
+    ssh_port: parseInt(document.getElementById('nm-port').value || '22', 10),
+  });
+  return false;
+}
+function saveMachine(id) {
+  send('/api/v1/machines/' + id, 'PATCH', {
+    alias: document.getElementById('m'+id+'-alias').value.trim(),
+    host: document.getElementById('m'+id+'-host').value.trim(),
+    ssh_user: document.getElementById('m'+id+'-user').value.trim(),
+    ssh_port: parseInt(document.getElementById('m'+id+'-port').value || '22', 10),
+  });
+}
+function createGroup(e) {
+  e.preventDefault();
+  send('/api/v1/groups', 'POST', {name: document.getElementById('ng-name').value.trim()});
+  return false;
+}
+</script>
+{% endblock %}

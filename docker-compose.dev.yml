@@ -1,22 +1,28 @@
+# Développement : code monté en direct, rechargement automatique,
+# dépendances de test installées, volume de base séparé de la production.
+
 services:
   taskins:
     build:
       context: .
       args:
-        HTTP_PROXY: ${HTTP_PROXY}
-        HTTPS_PROXY: ${HTTPS_PROXY}
-        NO_PROXY: ${NO_PROXY}
+        INSTALL_DEV: "true"
+        # Renseignés depuis le fichier passé à --env-file : une adresse
+        # d'infrastructure interne n'a pas à être versionnée dans Git.
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,192.168.*,10.*}
     container_name: taskins-app
     env_file: .env.dev
     ports:
-      - "80:80"
+      - "${TASKINS_HTTP_PORT:-8000}:8000"
     volumes:
       - taskins-db-dev:/app/data
       - ./secrets:/app/secrets:ro
       - .:/app
     networks:
       - taskins-net
-    command: uvicorn taskins.main:app --host 0.0.0.0 --port 80 --reload
+    command: uvicorn taskins.main:app --host 0.0.0.0 --port ${TASKINS_APP_PORT:-8000} --reload
 
 volumes:
   taskins-db-dev:

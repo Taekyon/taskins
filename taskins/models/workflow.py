@@ -18,12 +18,19 @@ class Workflow(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="DRAFT")
     created_at: Mapped[str] = mapped_column(Text, nullable=False, server_default=func.datetime("now"))
     updated_at: Mapped[str] = mapped_column(Text, nullable=False, server_default=func.datetime("now"))
+    # Archivage (suppression douce) : masqué des listes, historique conservé.
+    archived_at: Mapped[str | None] = mapped_column(Text)
 
     owner: Mapped["User"] = relationship("User", back_populates="workflows")  # noqa: F821
     group: Mapped["Group"] = relationship("Group", back_populates="workflows")  # noqa: F821
     tasks: Mapped[list["Task"]] = relationship(  # noqa: F821
         "Task", back_populates="workflow", cascade="all, delete-orphan"
     )
+    # cascade : la suppression définitive d'un workflow emporte ses exécutions
+    # (et, via Execution.task_results, leurs résultats).
     executions: Mapped[list["Execution"]] = relationship(  # noqa: F821
-        "Execution", back_populates="workflow"
+        "Execution", back_populates="workflow", cascade="all, delete-orphan"
+    )
+    schedules: Mapped[list["Schedule"]] = relationship(  # noqa: F821
+        "Schedule", back_populates="workflow", cascade="all, delete-orphan"
     )

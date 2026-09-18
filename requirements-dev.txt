@@ -1,0 +1,5 @@
+# Dépendances de test uniquement — absentes de l'image de production.
+pytest>=8.0.0
+# Requis par starlette.testclient dans les versions récentes de Starlette :
+# son absence provoque "The starlette.testclient module requires the httpx2 package".
+httpx2>=2.7.0
